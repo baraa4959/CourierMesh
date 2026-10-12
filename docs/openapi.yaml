@@ -41,14 +41,14 @@ paths:
                 value:
                   kind: otp
                   from: no-reply@notify.example.com
-                  to: student@example.com
+                  to: recipient@example.net
                   subject: Your verification code
                   code: '123456'
               raw:
                 value:
                   kind: raw
                   from: no-reply@notify.example.com
-                  to: student@example.com
+                  to: recipient@example.net
                   subject: Welcome
                   text: Thanks for joining.
       responses:
