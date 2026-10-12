@@ -1,75 +1,98 @@
-openapi: 3.0.3
+openapi: 3.1.0
 info:
-  title: CourierMesh OTP API
-  version: 1.1.0
-  description: OTP-only self-hosted email dispatch. HTTP 202 means queued, not delivered.
+  title: CourierMesh transactional gateway API
+  version: 1.2.0
+  description: Self-hosted transactional email gateway. A 202 response means queued or locally captured, not delivered to an inbox.
 servers:
-  - url: https://gateway.example.com
+  - url: https://your-gateway.example.org
 security:
-  - applicationToken: []
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Application API token, not admin session.
+  schemas:
+    Message:
+      oneOf:
+        - type: object
+          required: [kind, from, to, code]
+          properties:
+            kind: {const: otp}
+            from: {type: string, format: email}
+            to: {type: string, format: email}
+            code: {type: string}
+            subject: {type: string}
+            variables: {type: object}
+            dryRun: {type: boolean}
+        - type: object
+          required: [from, to, subject]
+          properties:
+            kind: {type: string, enum: [raw], default: raw}
+            from: {type: string, format: email}
+            to: {type: string, format: email}
+            subject: {type: string}
+            text: {type: string}
+            html: {type: string}
+            dryRun: {type: boolean}
+    Receipt:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        status: {type: string, enum: [queued, captured]}
+        duplicate: {type: boolean}
+        dryRun: {type: boolean}
+        transport: {type: string, enum: [api, smtp]}
 paths:
   /healthz:
     get:
       security: []
-      summary: Service health
       responses:
-        '200': {description: Healthy}
+        '200': {description: Service healthy}
   /v1/send:
     post:
-      summary: Queue one verification-code email
+      summary: Queue a transactional message or locally capture when dryRun is true
       parameters:
-        - name: Idempotency-Key
-          in: header
-          schema: {type: string, maxLength: 120}
+        - in: header
+          name: Idempotency-Key
+          schema: {type: string}
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/OtpMessage'
-            example:
-              kind: otp
-              from: no-reply@notify.example.com
-              to: recipient@example.net
-              code: '123456'
+            schema: {$ref: '#/components/schemas/Message'}
       responses:
-        '202': {description: Queued}
-        '400': {description: Invalid or non-OTP message}
+        '202':
+          description: Queued or captured
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Receipt'}
         '401': {description: Invalid token}
-        '403': {description: Sender not authorized}
-        '409': {description: Idempotency conflict}
-        '429': {description: Rate limited}
-        '503': {description: Queue full}
+        '403': {description: Sender not allowed}
+        '429': {description: Throttled}
+  /v1/probe:
+    post:
+      summary: Validate and capture one request without calling an email provider
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Message'}
+      responses:
+        '202':
+          description: Captured, never sent
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Receipt'}
   /v1/messages/{id}:
     get:
-      summary: Get OTP delivery state
+      summary: Get the status of a queued message from the calling application
       parameters:
-        - name: id
-          in: path
+        - in: path
+          name: id
           required: true
           schema: {type: string, format: uuid}
       responses:
-        '200': {description: Status returned}
-        '404': {description: Not found or not owned by application}
-components:
-  securitySchemes:
-    applicationToken:
-      type: http
-      scheme: bearer
-      bearerFormat: KEY_ID.SECRET
-  schemas:
-    OtpMessage:
-      type: object
-      required: [from, to, code]
-      additionalProperties: false
-      properties:
-        kind: {type: string, enum: [otp]}
-        from: {type: string, format: email}
-        to: {type: string, format: email}
-        code: {type: string, minLength: 4, maxLength: 24, pattern: '^[a-zA-Z0-9_-]+$'}
-        variables:
-          type: object
-          additionalProperties:
-            oneOf:
-              - {type: string}
-              - {type: number}
+        '200': {description: Queued message status}
+        '404': {description: Not found}

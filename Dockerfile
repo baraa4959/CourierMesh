@@ -5,6 +5,7 @@ COPY package.json ./
 COPY src ./src
 COPY public ./public
 COPY scripts/entrypoint.sh /entrypoint.sh
+COPY scripts/reset-admin.mjs /app/scripts/reset-admin.mjs
 RUN chmod +x /entrypoint.sh && mkdir -p /data && chown -R node:node /data /app
 USER node
 ENV NODE_ENV=production DB_PATH=/data/couriermesh.db HTTP_PORT=8080 SMTP_PORT=2525 SMTP_CERT=/data/tls/smtp.crt SMTP_KEY=/data/tls/smtp.key SMTP_REQUIRE_TLS=true

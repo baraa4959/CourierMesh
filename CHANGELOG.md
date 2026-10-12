@@ -21,3 +21,12 @@ All notable changes to CourierMesh are documented here. Versioning follows [Sema
 - Provider integrations tested with mocked remote APIs; real account validation required.
 - One-replica SQLite deployment; not a clustered gateway.
 - No provider webhook reconciliation or guaranteed end-to-end delivery confirmation.
+
+## [1.2.0] - 2026-10-12
+
+- Reintroduced standard transactional `raw` email through REST API and authenticated SMTP without breaking existing OTP requests and application keys.
+- Added privacy-safe REST `/v1/probe`, `dryRun:true`, SMTP `X-CourierMesh-Probe`, and time-limited capture mode for API and SMTP incoming traffic.
+- Redesigned the responsive control console with Arabic (RTL), English, French and Spanish translations, with no external CDN.
+- Added local administrator account bootstrap, random eight-character temporary password, forced password change, scrypt password hashes, expiring sessions, and trusted server-side reset command.
+- Kept optional existing `ADMIN_TOKEN` authorization, database paths, existing encrypted providers, API keys and private OTP templates compatible with previous deployments.
+- Updated documentation, OpenAPI spec, operations guide, smoke tests and Docker image.

@@ -35,3 +35,11 @@ API tokens can be revoked individually from the dashboard. For an ADMIN_TOKEN ro
 ## Reporting vulnerabilities
 
 See [`../SECURITY.md`](../SECURITY.md). Do not publish API tokens, domain ownership verification records, SMTP credentials, private recipient data or exploit proof-of-concepts in public issue trackers.
+
+## Administrator authentication since v1.2
+
+Local administrator login uses a one-time eight-character bootstrap password emitted only in the container runtime logs. This low-length secret is valid only until its first mandatory rotation to a strong password (12+ chars with uppercase, lowercase and a digit). Password hashes use scrypt and session tokens are stored hashed, expire after eight hours, and are revoked on password change. Failed logins have an IP-scoped throttle; place the admin console behind HTTPS and, preferably, a network access policy. Existing `ADMIN_TOKEN` authentication remains available *only if configured*; remove it after migration when no longer required. Never publish startup logs.
+
+## Diagnostics security
+
+The no-send diagnostic mode intercepts **all new** valid inbound messages while active (max ten minutes) and returns a capture receipt without provider calls. Use only during controlled testing. Individual `/v1/probe` and `dryRun:true` requests provide safer isolated testing. Diagnostic storage contains no payload or OTP; sender, masked recipient, timestamp, type, and transport are stored for up to 24 hours.

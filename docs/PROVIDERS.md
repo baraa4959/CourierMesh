@@ -8,7 +8,7 @@ CourierMesh **does not create an account, bypass verification, or expand a provi
 2. Create and **publish** a transactional template for OTP; use the case-sensitive variable `code` in the message body.
 3. Copy its transactional ID and create an API key.
 4. In CourierMesh, select `Loops` and enter `apiKey` and `transactionalId`.
-5. Test with a single controlled address. No generic-message template is used; this gateway accepts OTP only. Loops recipients are **not** automatically enrolled in marketing audiences (`addToAudience:false`).
+5. Test with a single controlled address. For ordinary transactional mail through Loops, optionally publish a **second generic** transactional template containing `subject` and `message` variables, and store its ID as `genericTransactionalId` in CourierMesh. OTP uses the original `transactionalId`. Loops recipients are **not** automatically enrolled in marketing audiences (`addToAudience:false`).
 
 Docs: [Loops transactional guide](https://app.loops.so/docs/transactional/guide).
 
@@ -70,3 +70,7 @@ For Resend, Brevo, Mailjet, SMTP2GO, and SendPulse, configure a private OTP subj
 ## Handling free-tier burst traffic
 
 No service automatically grants 1,000 accepted emails in a day from a new account. Confirm each service's daily and hourly acceptance capacity, and reserve budget for users who request a second OTP. If no provider is eligible, the gateway returns a clear failed/expired status rather than silently bypassing account restrictions.
+
+## Diagnostics
+
+Before testing real delivery, use [local connection diagnostics](DIAGNOSTICS.md) to confirm application tokens, sender authorization and SMTP/REST connectivity without contacting providers.

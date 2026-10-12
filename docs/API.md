@@ -1,59 +1,53 @@
-# OTP-only API and SMTP reference
+# API reference — CourierMesh 1.2
 
-CourierMesh accepts **verification codes only**. `kind: "raw"`, arbitrary HTML/text sending and SMTP messages without a verification header are rejected.
-
-## Authentication
-
-The admin dashboard uses the operator's `ADMIN_TOKEN` on `/admin/*`. Applications get a distinct key through **API & SMTP Keys**. The secret is shown once, in the `KEY_ID.SECRET` format.
-
-- HTTP: `Authorization: Bearer KEY_ID.SECRET`
-- SMTP: username `KEY_ID` and password `SECRET` after STARTTLS
-
-Store application secrets on your **backend**, never in a browser or mobile client.
+Base URL `https://your-gateway.example.org`. Protected application API endpoints use `Authorization: Bearer <APPLICATION_TOKEN>` over HTTPS. Create keys under **API & SMTP keys**; restrict each key to a sender address whenever possible. Application tokens are compatible with v1.0 and v1.1.
 
 ## POST /v1/send
 
-```http
-POST /v1/send
-Content-Type: application/json
-Authorization: Bearer KEY_ID.SECRET
-Idempotency-Key: signup-123-attempt-1
+Accepted JSON messages:
+
+```json
+{"kind":"otp","from":"no-reply@example.org","to":"user@example.net","code":"123456","variables":{"name":"User"}}
 ```
 
 ```json
-{
-  "kind": "otp",
-  "from": "no-reply@notify.example.com",
-  "to": "recipient@example.net",
-  "code": "123456"
-}
+{"kind":"raw","from":"no-reply@example.org","to":"user@example.net","subject":"Hello","text":"Welcome!","html":"<p>Welcome!</p>"}
 ```
 
-`kind` can be omitted, but if supplied it must be `otp`. `code` is required (4–24 alphanumeric, underscore or dash characters). Optional `variables` are forwarded to Loops for its published transactional template. `subject`, `text` and `html` are not configurable by the sender: the gateway uses the saved private template for the five non-Loops providers; Loops uses its published template.
+For backward compatibility, `kind` defaults to `raw`; for OTP, `subject` is optional. Raw messages require a subject and at least one of `text` or `html`. The content limit defaults to 64 KB combined. One destination address is supported per request. The optional `Idempotency-Key` request header deduplicates matching queued messages within one application key.
 
-On acceptance, HTTP returns `202` with `{ "id": "...", "status": "queued", "duplicate": false }`. This does **not** mean the email reached the recipient. Poll `GET /v1/messages/{id}` using the same application token.
+Returns HTTP 202 `{ "id":"...", "status":"queued", "duplicate":false }`. It means queued for outbound delivery, not delivered.
 
-`Idempotency-Key` prevents accidental double queueing, is scoped to the application key and must be at most 120 characters (letters, numbers, `_`, `.`, `:`, `-`). A conflicting request returns `409`. Use a new key for a new OTP attempt.
+Use `"dryRun":true` to validate and locally capture one request without contacting an external email provider. While admin-enabled global capture mode is active, `/v1/send` likewise returns `status: captured` and does not queue the received message.
 
-Response codes: `202` queued; `400` invalid/non-OTP message; `401` invalid token; `403` unauthorized sender; `409` idempotency conflict; `429` rate limited; `503` queue full.
+## POST /v1/probe
 
-## GET /v1/messages/{id}
+Uses exactly the same authentication, sender validation and request shapes as `/v1/send` but **always** records a local, sanitized test receipt. Returns HTTP 202 `{ "id":"<UUID>", "status":"captured", "transport":"api", "dryRun":true }`. Message content is not persisted or forwarded.
 
-States: `queued`, `processing`, `accepted` (provider accepted), `failed`, `expired`, `unknown` (ambiguous provider outcome, not automatically resent).
+## GET /v1/messages/:id
 
-## Admin template endpoints
+Bearer token required. Returns status for a queued message created by the same API key. A locally captured diagnostic does **not** have a queue status; view recent probes under `/admin/diagnostics` instead.
 
-All require `Authorization: Bearer ADMIN_TOKEN` over HTTPS.
+## Browser administrator sessions
 
-- `GET /admin/otp-template`: `{ "configured": false, "template": null }` when no template is saved; otherwise includes the decrypted template **for the authenticated administrator only**.
-- `PUT /admin/otp-template`: save `{ "subject": "...", "text": "...{{code}}...", "html": "...{{code}}...", "direction": "rtl" }`. HTML is optional, but a code marker must appear in both text and custom HTML.
+- `POST /auth/login` with `{"username":"admin","password":"..."}` — returns a short-lived administrator session token and `mustChangePassword` boolean. This is *not* an application sending token.
+- `GET /admin/session` — current session summary. For compatibility, an existing `ADMIN_TOKEN` may still be used if set in the server environment.
+- `PUT /admin/account/password` — `{"currentPassword":"...","newPassword":"..."}`. New password must be 12–128 characters with uppercase, lowercase and a digit. This revokes all existing password sessions; log in again.
+- `POST /admin/logout` — revoke current password-based session.
+- `GET /admin/stats`, `GET /admin/providers`, `POST /admin/providers`, `PATCH /admin/providers/:id` — providers and quotas.
+- `GET /admin/keys`, `POST /admin/keys`, `DELETE /admin/keys/:id` — application tokens.
+- `GET /admin/messages` — recent message metadata.
+- `GET /admin/otp-template`, `PUT /admin/otp-template` — encrypted operator-provided OTP template.
+- `POST /admin/test-send` — enqueue a real OTP or general transactional test, except when capture mode is on.
+- `GET /admin/diagnostics` — mode and last 100 sanitized captures.
+- `PUT /admin/diagnostics` — `{"seconds":600}` to turn on for a maximum ten minutes, `{"seconds":0}` to turn off.
 
-Templates are stored encrypted in the persistent SQLite database, not source control. See [Private OTP templates](PRIVATE-OTP-TEMPLATES.md).
+All `/admin/*` routes require admin session or legacy admin token. New password-session holders are restricted to password change while their initial temporary password is in use.
 
-Other admin endpoints: `GET /admin/session`, `GET /admin/stats`, `POST /admin/test-send`, `GET/POST /admin/providers`, `PATCH/DELETE /admin/providers/:id`, `GET/POST /admin/keys`, `DELETE /admin/keys/:id`, and `GET /admin/messages`.
+## SMTP
 
-Provider credential types: Loops (`apiKey`, `transactionalId`), Resend/Brevo/SMTP2GO (`apiKey`), Mailjet (`apiKey`, `secretKey`) and SendPulse (`clientId`, `clientSecret`).
+Submission to private `SMTP_PORT=2525` with STARTTLS and AUTH PLAIN/LOGIN. Username is **application key ID** and password is its secret (the substring after `.` in the generated HTTP Bearer token). Supports one message recipient per envelope and basic `text/plain`, `text/html` and `multipart/alternative`; MIME attachments are intentionally unsupported. OTP is selected by `X-CourierMesh-OTP: 123456`. A normal message without this header is treated as `raw`. For a no-send test include `X-CourierMesh-Probe: true` or enable temporary global capture mode.
 
-## SMTP OTP submission
+## Status and errors
 
-On private network port `2525`, use `EHLO`, `STARTTLS`, `AUTH`, `MAIL FROM`, `RCPT TO`, `DATA`. The SMTP email **must** include header `X-CourierMesh-OTP: 123456`. Its arbitrary body and subject are ignored; the centrally managed templates determine content. Exactly one recipient is supported. Attachments are not supported. Keep the submission port private; HTTPS REST API is the recommended method.
+The gateway validates requests and enforces sender allowlists. Common responses: 400 invalid message, 401 invalid token, 403 sender blocked, 409 conflicting idempotency key, 428 mandatory admin password reset, 429 throttled, 503 queue capacity. An external provider's `accepted` state means **handoff**, not inbox delivery. An `unknown` outcome is not retried automatically to avoid duplicates.

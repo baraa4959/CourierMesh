@@ -1,179 +1,90 @@
 <div align="center">
+  <img src="public/logo.svg" width="88" alt="CourierMesh logo" />
 
-<img src="public/logo.svg" alt="CourierMesh logo" width="92" />
+  # CourierMesh
 
-# CourierMesh
+  **One endpoint. Flexible delivery. Complete control.**
 
-**One endpoint. Six delivery adapters. Your limits, under control.**
+  A self-hosted transactional email gateway with a responsive admin console, six outbound HTTPS providers, a private SMTP receiver, durable SQLite queue, and a safe built-in connection test lab.
 
-An open-source, self-hosted, **OTP-only** email delivery gateway for any application requiring verification codes. Deploy on a single VM without a paid database, Redis queue, or proprietary backend.
-
-![License](https://img.shields.io/badge/license-MIT-blue.svg) ![Node](https://img.shields.io/badge/node-22%2B-339933) ![Docker](https://img.shields.io/badge/deployment-Docker-2496ed) ![SMTP](https://img.shields.io/badge/SMTP-STARTTLS-35bfaa) ![Providers](https://img.shields.io/badge/providers-6-8475ef)
-
-[Quick start](#quick-start) · [Providers](#providers) · [Provider setup](docs/PROVIDERS.md) · [Architecture](#architecture) · [Security](docs/SECURITY.md) · [API](docs/API.md) · [OpenAPI](docs/openapi.yaml) · [Deployment](docs/DEPLOYMENT.md) · [Operations](docs/OPERATIONS.md)
-
+  [Getting started](#quick-start) · [API reference](docs/API.md) · [Providers](docs/PROVIDERS.md) · [Deployment](docs/DEPLOYMENT.md) · [Diagnostics](docs/DIAGNOSTICS.md) · [Security](docs/SECURITY.md)
 </div>
 
----
+## Features
 
-## Why CourierMesh?
-
-Connect applications to multiple email delivery providers without exposing an outbound SMTP port 25 dependency. CourierMesh accepts OTP messages through **one authenticated HTTPS API** or **one internal SMTP endpoint**, then hands them to whichever configured provider has available capacity.
-
-It does not bypass the terms, approval requirements, abuse checks, or quotas imposed by a provider. Your account is responsible for ensuring that its sending volume and domain authorization are valid.
-
-### At a glance
-
-| Capability | Included |
-|---|---|
-| Six provider integrations | Loops, Resend, Brevo, Mailjet, SMTP2GO, SendPulse |
-| Application connectivity | HTTPS JSON API + authenticated SMTP submission |
-| Quota policies | Per-provider per-minute, per-hour, per-UTC-day, rolling 30-day caps |
-| Routing | Priority-based with quota-aware fallthrough |
-| Availability | Durable SQLite outbox, configurable parallel workers |
-| Safety | No retry if provider acceptance is uncertain |
-| Access | Scoped application keys, one-time token display, sender allowlist |
-| Visibility | Browser admin console, message states, quota meters, provider list |
-| Encryption | AES-256-GCM encryption for provider credentials, private OTP templates and queued OTP payloads |
-| Infrastructure | Docker, Easypanel, SQLite, one service |
-| Privacy | No analytics, no tracking pixels, no marketing list synchronization |
-
-**Limits of scope:** CourierMesh does not host mailboxes, receive MX mail, verify inbox delivery, handle bounces automatically, manage marketing audiences, or offer guaranteed exactly-once external delivery. Read [Design decisions](docs/ARCHITECTURE.md).
-
-## Architecture
-
-```mermaid
-flowchart TD
-    A[Any application] -->|HTTPS 443 / REST API| B[CourierMesh]
-    A -->|Internal SMTP 2525 / STARTTLS| B
-    B --> C[(Encrypted SQLite outbox)]
-    C --> D{Priority and quota router}
-    D --> E[Loops - templates]
-    D --> F[Resend]
-    D --> G[Brevo]
-    D --> H[Mailjet]
-    D --> I[SMTP2GO]
-    D --> J[SendPulse]
-    E --> K[Recipient inbox]
-    F --> K
-    G --> K
-    H --> K
-    I --> K
-    J --> K
-```
-
-All six provider adapters make outbound requests over HTTPS **port 443**. This design works on hosts where direct outbound SMTP port 25 is restricted, provided the selected providers permit sending from your account.
+- **One REST API** for OTP and plain-text/HTML transactional email, plus private authenticated **SMTP with STARTTLS**.
+- **Six outbound adapters:** Loops, Resend, Brevo, Mailjet, SMTP2GO and SendPulse. Delivery is through the providers' HTTPS APIs; outbound TCP port 25 is not required.
+- **Connection diagnostics:** temporarily capture **all new incoming** API/SMTP messages without sending to a provider, automatically expiring after 10 minutes; or test just one API message with `POST /v1/probe` / `dryRun: true` or one SMTP message with `X-CourierMesh-Probe: true`.
+- **English, العربية, Français, Español**, including right-to-left Arabic layout; all frontend assets are served locally with no CDN dependency.
+- **Admin login:** first deployment generates user `admin` and a one-time eight-character password shown only in runtime logs. Login forces an immediate change to a stronger password. Password hashes use scrypt. Session tokens are hashed and expire after eight hours. Existing `ADMIN_TOKEN` remains supported, if configured.
+- **Private OTP templates:** configure subject, plain text, RTL/LTR and optional HTML from the admin console. The contents are encrypted in the local SQLite volume, never committed to GitHub. Loops OTP uses its own published Loops template.
+- **Operational safety:** sender allowlists, independent application keys, provider quotas and priorities, encrypted credential storage, private queues, message expiry, failover after definitive rejection, and no automatic retry when provider acceptance is uncertain.
 
 ## Quick start
 
-Requirements: Docker Engine and Docker Compose. Production containers run Node.js 22 with SQLite built in. **No `npm install` required.**
+Requires Node.js **22.13+** or Docker and a **persistent writable** `/data` volume.
 
-```bash
+```sh
 cp .env.example .env
-node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
-node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
-# Use DIFFERENT outputs in .env:
-# ADMIN_TOKEN=<32+ random chars>
-# ENCRYPTION_KEY=<64 hexadecimal chars>
-# ALLOWED_SENDERS=no-reply@notify.yourdomain.com
-
-docker compose up -d --build
-curl -fsS http://127.0.0.1:8080/healthz
+# Set ENCRYPTION_KEY to a new 64-character random hexadecimal string:
+openssl rand -hex 32
+# Copy the result into .env as ENCRYPTION_KEY=...
+# Never commit .env or expose the database, logs or configuration secrets.
+npm start
 ```
 
-Open the admin console on `http://127.0.0.1:8080` through an HTTPS reverse proxy for remote access. For SSH-only access, use `ssh -L 8080:127.0.0.1:8080 ubuntu@YOUR_SERVER` and open `http://localhost:8080` locally. **Never publish admin HTTP directly to the Internet without TLS.**
+Open `http://localhost:8080` locally. The **first startup** logs a generated `admin` password **once**. Change it at first login. Use HTTPS and a restricted admin dashboard for public deployment. For Easypanel use the included `Dockerfile`, internal HTTP port **8080** and persistent mount **`/data`**.
 
-1. Sign in using your `ADMIN_TOKEN`.
-2. Add and enable a provider with verified sending domain, API credentials, and quotas.
-3. Configure your private OTP subject, text, and optional HTML under **OTP Template**. Nothing you enter there is committed to GitHub.
-4. Create an application key with an exact authorized sender address.
-5. Connect via HTTPS API (preferred) or authenticated private-network SMTP with `X-CourierMesh-OTP` header.
-6. Run a real single-recipient acceptance and inbox test before sending production traffic.
+> ⚠️ An eight-character password is a temporary bootstrap secret **only**, not an acceptable long-term administrator password. First login requires a 12+ character replacement with uppercase, lowercase and numeric characters. Keep startup logs private and rotate any legacy `ADMIN_TOKEN` as part of normal secret hygiene.
 
-For Easypanel instructions, persistent storage, networking, TLS trust, and deployment constraints, see [Deployment](docs/DEPLOYMENT.md).
+## Connecting an application
 
-## Providers
+Create an application key under **API & SMTP keys** in the dashboard. Keep the Bearer token in your backend, never browser JavaScript.
 
-| Adapter | Input | Provider account prerequisites | Typical purpose |
-|---|---|---|---|
-| **Loops** | OTP | API key and published OTP transactional ID | Provider-side OTP template |
-| **Resend** | OTP | API key and verified sender/domain | Private gateway OTP template |
-| **Brevo** | OTP | API key and verified sender/domain | Private gateway OTP template |
-| **Mailjet** | OTP | API key, secret and verified sender | Private gateway OTP template |
-| **SMTP2GO** | OTP | API key and verified sender | Private gateway OTP template |
-| **SendPulse** | OTP | API client ID, secret and approved account | Private gateway OTP template |
+**OTP:**
 
-**Private template:** configure the subject, text, optional HTML and RTL/LTR direction in the admin dashboard. Use `{{code}}` for dynamic substitution. The template content stays AES-256-GCM-encrypted in SQLite under your private persistent `/data` volume, never in GitHub. The five non-Loops adapters all use this same template. Loops retains its separate published template and cannot automatically sync its HTML. See [Private OTP templates](docs/PRIVATE-OTP-TEMPLATES.md).
-
-**OTP-only:** REST submissions containing `kind: raw`, `text` or `html` are rejected. SMTP clients must supply `X-CourierMesh-OTP`, and arbitrary SMTP mail is rejected. No receipts, marketing campaigns, notifications or general mail are permitted by this gateway.
-
-### Conservative dashboard defaults (verify against your plan)
-
-| Provider | Daily | 30-day | Hourly | Minute |
-|---|---:|---:|---:|---:|
-| Loops | 0 (no daily cap set) | 4,000 | 600 | 8 |
-| Resend | 100 | 3,000 | 100 | 4 |
-| Brevo | 300 | 9,000 | 300 | 5 |
-| Mailjet | 200 | 6,000 | 200 | 3 |
-| SMTP2GO | 200 | 1,000 | 200 | 3 |
-| SendPulse | 400 | 12,000 | 50 | 1 |
-
-These defaults are *locally configured safety budgets*, **not** verified account entitlements. Provider offers, rate limits, account status and terms change. The monthly cap is a conservative **rolling 30-day window**. Daily resets at **00:00 UTC**. A zero cap means *no local cap*—it does not change the provider's own cap. Set more restrictive numbers for new/unapproved accounts.
-
-## Send an OTP (HTTPS)
-
-```bash
-curl -X POST https://mail-gateway.example.com/v1/send \
-  -H 'Authorization: Bearer KEY_ID.SECRET' \
-  -H 'Idempotency-Key: signup-user-123' \
-  -H 'Content-Type: application/json' \
-  -d '{"kind":"otp","from":"no-reply@notify.example.com","to":"recipient@example.net","code":"123456"}'
+```sh
+curl -X POST https://mail.example.org/v1/send \
+ -H 'Authorization: Bearer <APP_KEY>' \
+ -H 'Content-Type: application/json' \
+ -d '{"kind":"otp","from":"no-reply@example.org","to":"user@example.net","code":"123456"}'
 ```
 
-The sender does not specify the email's subject or message body; the central template controls them. Loops uses its published OTP transactional template, while the other five providers use the private gateway template. See [API reference](docs/API.md).
+**General transactional email:**
 
-```json
-{"id":"75f...","status":"queued","duplicate":false}
+```sh
+curl -X POST https://mail.example.org/v1/send \
+ -H 'Authorization: Bearer <APP_KEY>' \
+ -H 'Content-Type: application/json' \
+ -d '{"kind":"raw","from":"no-reply@example.org","to":"user@example.net","subject":"Hello","text":"Welcome aboard"}'
 ```
 
-A `202` response means the request is **durably queued**, **not delivered**. Poll `GET /v1/messages/{id}` using the same application key to observe `accepted`, `failed`, `expired`, or `unknown`. For time-sensitive messages such as OTP codes, align your application's expiration policy with the gateway queue deadline. Never expose the application key to browser JavaScript.
+For an integration test **without sending anything externally**, change `/v1/send` to `/v1/probe` or add `"dryRun":true`; use an active key and a permitted sender. `202 {"status":"captured"}` proves CourierMesh authenticated and validated the submission, **not** delivery to an inbox. More information: [Diagnostics](docs/DIAGNOSTICS.md).
 
-For SMTP usage, see [API and SMTP](docs/API.md). For the implementation details of quota routing and crash recovery, see [Architecture](docs/ARCHITECTURE.md).
+## How routing works
 
-## Project structure
+CourierMesh accepts one recipient per message, routes by priority and local provider quota, and queues encrypted content. Loops sends OTP through a published Loops template; general messages via Loops additionally require `genericTransactionalId`. Other providers can send general email directly; OTP via these providers requires a private OTP template configured in the dashboard. Limit fields are locally configured budgets, **not** guarantees of provider availability.
 
-```text
-couriermesh/
-├── src/                  # Node 22 server, SMTP, SQLite outbox, provider adapters
-├── public/               # Responsive control plane + vector brand mark
-├── docs/                 # Architecture, deployment, API, operations, security
-├── tests/                # Node built-in test runner
-├── examples/             # Integration samples
-├── .github/workflows/    # Continuous integration
-├── Dockerfile
-├── compose.yaml
-├── .env.example
-└── LICENSE
-```
+`accepted` means *the provider API accepted the request*, not *delivered to the recipient*. `unknown` means external acceptance could not be confirmed and automatic resends are suppressed.
 
-## Development
+## Upgrade from v1.0 / v1.1 (Easypanel)
 
-```bash
-node --version        # 22.13+ recommended
-npm run check
-npm test
-```
+1. **Back up `/data`** (all SQLite database and TLS files) and your existing environment variables. Use a database-consistent backup while the service is stopped, or `sqlite3 .backup` if available.
+2. **Keep the same `ENCRYPTION_KEY`, `DB_PATH`, domain, application keys and persistent `/data` mount.** Do not delete the original volume and keep **one replica** for SQLite.
+3. Pull the latest `main` and **rebuild/redeploy** your Docker service. New schema tables are added in place; existing providers, keys and private OTP template are retained.
+4. The migration also creates a local admin account and prints its **temporary password once** in the runtime logs. Existing `ADMIN_TOKEN` login continues to work if set. A newly initialized admin account does not invalidate old API/SMTP application tokens.
+5. Log in with `admin`, change its password, open **Diagnostics**, and run a no-send probe before sending real messages.
+6. Disable or reconfigure any unwanted provider. **Probe mode intercepts new submissions from *all* applications** until stopped or timed out; do not turn it on during live verification traffic.
 
-The core runtime is dependency-free, enabling offline tests and limiting supply-chain exposure. SQLite support in Node.js 22 is currently marked experimental; pin a known-working Node image and validate newer releases before deployment. The Dockerfile currently uses Node 22; for strict production reproducibility, pin it to a tested patch or digest.
+If the first-run password was lost, use the server console to run `node /app/scripts/reset-admin.mjs` inside the running container; it rotates the administrator password, invalidates admin sessions and shows another one-time temporary password. It does **not** alter application API keys.
 
-## Open-source project
+## Privacy and limitations
 
-MIT licensed. Contributions are welcome: see [Contributing](CONTRIBUTING.md), [Code of Conduct](CODE_OF_CONDUCT.md), and [Security policy](SECURITY.md). Please follow providers' published rate limits and anti-spam rules. This project is not affiliated with Loops, Resend, Brevo, Mailjet, SMTP2GO or SendPulse.
+- No private organization-branded message is bundled or committed; custom templates are entered at runtime.
+- Outbound sending depends on third-party service approvals, DNS verification, quotas and limits. No account restrictions are bypassed.
+- Basic SMTP intentionally supports **one recipient**, `text/plain`, `text/html` and `multipart/alternative`; **attachments, arbitrary MIME types, mailbox reception and IMAP are not supported**.
+- This is a **transactional gateway**, not a bulk marketing mailer or mailbox provider.
+- Only **one SQLite-writing service instance** is supported. Do not make two replicas share `/data`.
+- Privacy-safe diagnostics retain **sender, masked recipient, type, transport and timestamp**, without message content, for up to one day. Do not log secrets or publicly publish the dashboard.
 
-### Release readiness
-
-The repository includes unit/integration tests with simulated provider responses and a functional local SMTP/API path. **Live provider delivery, real-world DNS alignment, Easypanel deployment, load testing, independent security review, and 1,000-user launch validation still require real accounts and deployment access.** Do not assume a provider's acceptance response means the message reached the inbox.
-
-## GitHub and private content
-
-Only code, generic examples and documentation belong in this public repository. Keep your actual OTP message content in the **OTP Template** settings on the running server, backed by a persistent and backed-up `/data` volume. Never commit `.env`, production templates, private TLS keys or the encryption key. The project's public source may be reused without reproducing anyone's private template.
+See [Architecture](docs/ARCHITECTURE.md), [Security](docs/SECURITY.md), [API](docs/API.md), [Provider setup](docs/PROVIDERS.md) and [Operations](docs/OPERATIONS.md). MIT licensed.

@@ -14,8 +14,8 @@ CourierMesh supports a single-instance deployment. The application has two liste
 
 ```bash
 cp .env.example .env
-openssl rand -hex 32 # first value -> ADMIN_TOKEN
-openssl rand -hex 32 # second value -> ENCRYPTION_KEY
+openssl rand -hex 32 # ENCRYPTION_KEY (keep this same on future upgrades)
+# ADMIN_TOKEN is optional on fresh installations; retain existing one for backward compatibility if desired.
 chmod 600 .env
 docker compose up -d --build
 docker compose ps
@@ -30,12 +30,12 @@ The example binds HTTP **only** to `127.0.0.1:8080` and exposes SMTP `2525` only
 2. Build using the Dockerfile at repository root.
 3. Set service HTTP port to **8080**; create an HTTPS domain such as `gateway.example.com` via Easypanel.
 4. Add a persistent mounted volume with **container path `/data`**. Never replace the volume during upgrades.
-5. Set every environment variable in `.env.example` using Easypanel's secret/environment settings; use two different random secrets for `ADMIN_TOKEN` and `ENCRYPTION_KEY`.
+5. Set required `ENCRYPTION_KEY` (64 hex characters) plus your existing settings. `ADMIN_TOKEN` is optional for fresh installations; keep a previously used token unchanged through an upgrade for backward compatibility.
 6. Ensure `SMTP_CERT=/data/tls/smtp.crt` and `SMTP_KEY=/data/tls/smtp.key`. The container initializes a private self-signed STARTTLS certificate on first boot if they are missing. Prefer a trusted internal CA or a real certificate when possible.
 7. Configure the application and CourierMesh services on a shared **private Docker network** if you want SMTP access. Refer to the actual Docker DNS service alias assigned by Easypanel; do not assume it is `couriermesh`.
 8. Do **not** create a public TCP port mapping for 2525. If the app is on a separate network, join both services to a common private Docker network instead.
-9. Visit `https://gateway.example.com`, unlock with `ADMIN_TOKEN`, and add one provider and one application key.
-10. Send a **single test** OTP to a controlled inbox and confirm actual delivery before increasing traffic.
+9. Visit `https://gateway.example.com`. Sign in using `admin` and the one-time temporary password printed in the **runtime logs**, change it immediately, and add one provider and one application key. Previously configured `ADMIN_TOKEN` still works via the legacy sign-in option.
+10. Use **Diagnostics → Enable for 10 minutes** to confirm API/SMTP connectivity without sending, then stop capture and send a single real test to a controlled inbox.
 
 Use a reverse proxy with `request_body_limit` equal to or below the gateway limits. Do not use Cloudflare orange-cloud for direct TCP SMTP: the gateway's SMTP service is private and does not need a public DNS record.
 
@@ -62,7 +62,7 @@ Do not globally set `NODE_TLS_REJECT_UNAUTHORIZED=0`. An administrator can consc
 
 | Name | Default | Description |
 |---|---|---|
-| `ADMIN_TOKEN` | required | 32+ random characters. Required for administrative endpoints. |
+| `ADMIN_TOKEN` | optional | Legacy administrator token; if set, requires at least 32 random characters. Keep on upgrade if applications rely on it, and plan to retire it after migration. |
 | `ENCRYPTION_KEY` | required | 32 bytes encoded as 64 hex characters. Protect and back up securely. |
 | `DB_PATH` | `/data/couriermesh.db` in container | Persistent encrypted SQLite metadata and outbox. |
 | `HTTP_HOST` / `HTTP_PORT` | `0.0.0.0` / `8080` | HTTP API and web dashboard; reverse-proxy TLS. |
@@ -87,3 +87,9 @@ The gateway is **not an MX receiver**. There is no reason to point `example.com`
 ## Scaling and reliability
 
 Use **exactly one active CourierMesh replica** when sharing its SQLite volume. SQLite's transaction-based reservations prevent same-process quota races, but the project does not include distributed leader election or shared worker leases. Back up `/data` daily. A rollback must preserve the volume and the original `ENCRYPTION_KEY`. To increase throughput for busy periods, tune `WORKER_CONCURRENCY`, provider minute/hour quotas, and `MAX_QUEUE_DEPTH` only after validating provider acceptance and limits.
+
+## First login and upgrades
+
+First deployment (including upgrades from v1.1 without an admin account) creates a local `admin` user with an eight-character cryptographically generated temporary password, **printed only once in runtime logs**. Change it immediately after login; permanent passwords must be 12+ characters with uppercase, lowercase and a number. Protect the logs. To reset the account from a trusted server terminal run `node /app/scripts/reset-admin.mjs`; this does not revoke application keys. On a production upgrade, first back up the SQLite `/data` volume, keep the same `ENCRYPTION_KEY`, build the new image from GitHub, and redeploy a **single replica**.
+
+Use [Diagnostics](DIAGNOSTICS.md) for provider-free HTTP API and SMTP connectivity tests. When global capture is on, new real requests are intercepted and **not sent** until the ten-minute timer expires or capture is stopped. Avoid enabling it during live operation.

@@ -3,7 +3,7 @@ const int = (key, fallback, min, max) => { const v = Number(process.env[key] ?? 
 export function getConfig() {
   const adminToken = process.env.ADMIN_TOKEN ?? '';
   const encryptionKey = process.env.ENCRYPTION_KEY ?? '';
-  if (adminToken.length < 32) throw Error('ADMIN_TOKEN must contain at least 32 random characters');
+  if (adminToken && adminToken.length < 32) throw Error('ADMIN_TOKEN must contain at least 32 random characters when supplied');
   if (!/^[a-f\d]{64}$/i.test(encryptionKey)) throw Error('ENCRYPTION_KEY must be exactly 64 hexadecimal characters (32 bytes)');
   return {
     adminToken, encryptionKey: Buffer.from(encryptionKey, 'hex'),

@@ -26,7 +26,7 @@ The API client does **not** supply subject or body. Those are controlled central
 
 ## SMTP
 
-SMTP clients must supply `X-CourierMesh-OTP: 123456` as a message header. Ordinary free-form SMTP messages without that header are rejected. SMTP remains private-network only; HTTP API is preferred for OTP integrations.
+SMTP clients can supply `X-CourierMesh-OTP: 123456` to select the OTP template. Without the header, a supported ordinary SMTP message is handled as a general transactional email. SMTP remains private-network only; HTTP API is preferred for OTP integrations.
 
 ## Privacy and backup
 

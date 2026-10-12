@@ -8,7 +8,7 @@
 4. Worker claims the oldest eligible queued message, reserves a provider quota slot and records an attempt **in the same transaction**.
 5. API adapter calls a fixed allowlisted HTTPS endpoint with a timeout.
 6. Result is recorded as accepted / rejected / uncertain. Definitive rejection can fall through to the next provider. Ambiguous outcomes are marked **unknown and never retried**.
-7. Completed messages are visible in the admin console for 14 days; privacy-redacted quota records are retained for 35 days. OTP payload ciphertext is cleared when accepted / unknown / failed / expired.
+7. Completed messages are visible in the admin console for 14 days; privacy-redacted quota records are retained for 35 days. Message ciphertext is cleared when accepted / unknown / failed / expired.
 
 ## Quotas and selection
 
@@ -18,7 +18,7 @@ This scheduler is a **local budget guard**, not a real-time copy of provider-sid
 
 ## Durability and duplicates
 
-The gateway provides durable at-least-once *queue acceptance* and conservative delivery attempts—not end-to-end exactly-once email delivery. On a network timeout, TLS error, upstream 5xx, or a crash during a provider call, it is not possible to know reliably whether the provider accepted the mail. The project deliberately stops and reports `unknown` rather than trying another provider and causing duplicate OTP emails. A client must decide whether the user should request a new OTP.
+The gateway provides durable at-least-once *queue acceptance* and conservative delivery attempts—not end-to-end exactly-once email delivery. On a network timeout, TLS error, upstream 5xx, or a crash during a provider call, it is not possible to know reliably whether the provider accepted the mail. The project deliberately stops and reports `unknown` rather than trying another provider and causing duplicate emails. An application must decide whether a new message or OTP should be requested.
 
 Resend receives an Idempotency-Key for additional provider-side protection. Other providers do not offer identical request semantics.
 
@@ -28,7 +28,7 @@ Resend receives an Idempotency-Key for additional provider-side protection. Othe
 
 ## Privacy and retention
 
-Application plaintext OTPs and email bodies are encrypted before persistence using AES-256-GCM with a 32-byte operator-supplied master key. Provider credentials use the same mechanism. Non-sensitive metadata includes masked recipient and SHA-256 recipient fingerprint. An SHA-256 email fingerprint is not inherently anonymous against dictionary attacks; protect SQLite backups accordingly. Detailed message activity is shown only for 14 days. Recipient metadata is redacted at day 14, while minimal quota records are retained for 35 days to preserve 30-day rolling quota integrity. The master key must remain stable across restarts; rotation requires an offline migration.
+Application OTPs and general email bodies are encrypted before persistence using AES-256-GCM with a 32-byte operator-supplied master key. Provider credentials use the same mechanism. Non-sensitive metadata includes masked recipient and SHA-256 recipient fingerprint. An SHA-256 email fingerprint is not inherently anonymous against dictionary attacks; protect SQLite backups accordingly. Detailed message activity is shown only for 14 days. Recipient metadata is redacted at day 14, while minimal quota records are retained for 35 days to preserve 30-day rolling quota integrity. The master key must remain stable across restarts; rotation requires an offline migration.
 
 ## Explicit non-goals
 
@@ -37,3 +37,11 @@ Application plaintext OTPs and email bodies are encrypted before persistence usi
 - General MIME attachments, mail merges, mass marketing, bulk distribution.
 - Distributed leader election, multi-region clustering, automated provider onboarding.
 - Circumventing provider terms or subscription quotas.
+
+## Diagnostic interception
+
+Each received submission is authenticated and validated first. When global capture mode (with a maximum 10-minute expiry), per-message `dryRun`, `/v1/probe`, or SMTP `X-CourierMesh-Probe` is active, a sanitized diagnostic receipt is recorded instead of enqueueing. The queue and provider quotas remain untouched. Preexisting queued jobs are not paused. Captured diagnostics expire after one day; no message bodies, OTPs or credentials are retained.
+
+## Administrator migration
+
+Old `ADMIN_TOKEN` login remains available only when explicitly configured. New local `admin` credentials use a one-time eight-character bootstrap password and require a stronger replacement. Passwords are scrypt hashed, sessions expire after eight hours and are revocable. Admin credentials and session records are local SQLite state and survive upgrades that preserve `/data`.
