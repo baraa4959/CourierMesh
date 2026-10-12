@@ -86,4 +86,4 @@ The gateway is **not an MX receiver**. There is no reason to point `example.com`
 
 ## Scaling and reliability
 
-Use **exactly one active CourierMesh replica** when sharing its SQLite volume. SQLite's transaction-based reservations prevent same-process quota races, but the project does not include distributed leader election or shared worker leases. Back up `/data` daily. A rollback must preserve the volume and the original `ENCRYPTION_KEY`. To increase throughput for launch day, tune `WORKER_CONCURRENCY`, provider minute/hour quotas, and `MAX_QUEUE_DEPTH` only after validating provider acceptance and limits.
+Use **exactly one active CourierMesh replica** when sharing its SQLite volume. SQLite's transaction-based reservations prevent same-process quota races, but the project does not include distributed leader election or shared worker leases. Back up `/data` daily. A rollback must preserve the volume and the original `ENCRYPTION_KEY`. To increase throughput for busy periods, tune `WORKER_CONCURRENCY`, provider minute/hour quotas, and `MAX_QUEUE_DEPTH` only after validating provider acceptance and limits.
