@@ -1,0 +1,173 @@
+openapi: 3.0.3
+info:
+  title: CourierMesh Application API
+  version: 1.0.0
+  description: >-
+    A self-hosted asynchronous transactional email gateway.
+    202 means a message is queued, not delivered to an inbox.
+servers:
+  - url: https://gateway.example.com
+security:
+  - applicationToken: []
+paths:
+  /healthz:
+    get:
+      summary: Unauthenticated liveness endpoint
+      security: []
+      responses:
+        '200':
+          description: Healthy
+  /v1/send:
+    post:
+      summary: Queue a single-recipient transactional message
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+            maxLength: 120
+          description: Caller-scoped idempotency key. A conflicting payload results in HTTP 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/OtpMessage'
+                - $ref: '#/components/schemas/RawMessage'
+            examples:
+              otp:
+                value:
+                  kind: otp
+                  from: no-reply@notify.example.com
+                  to: student@example.com
+                  subject: Your verification code
+                  code: '123456'
+              raw:
+                value:
+                  kind: raw
+                  from: no-reply@notify.example.com
+                  to: student@example.com
+                  subject: Welcome
+                  text: Thanks for joining.
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueReceipt'
+        '400':
+          description: Validation error
+        '401':
+          description: Invalid application token
+        '403':
+          description: Sender not allowed
+        '409':
+          description: Reused idempotency key with conflicting payload
+        '429':
+          description: Request rate limit
+        '503':
+          description: Queue at capacity
+  /v1/messages/{id}:
+    get:
+      summary: Read queue/provider-acceptance status for a message
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Message receipt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageStatus'
+        '404':
+          description: Not found or owned by another application
+components:
+  securitySchemes:
+    applicationToken:
+      type: http
+      scheme: bearer
+      bearerFormat: KEY_ID.SECRET
+  schemas:
+    CommonFields:
+      type: object
+      required: [from, to, subject]
+      properties:
+        from:
+          type: string
+          format: email
+        to:
+          type: string
+          format: email
+        subject:
+          type: string
+          maxLength: 180
+    OtpMessage:
+      allOf:
+        - $ref: '#/components/schemas/CommonFields'
+        - type: object
+          required: [kind, code]
+          properties:
+            kind:
+              type: string
+              enum: [otp]
+            code:
+              type: string
+              minLength: 4
+              maxLength: 24
+            variables:
+              type: object
+              additionalProperties:
+                oneOf:
+                  - type: string
+                  - type: number
+    RawMessage:
+      allOf:
+        - $ref: '#/components/schemas/CommonFields'
+        - type: object
+          required: [kind]
+          properties:
+            kind:
+              type: string
+              enum: [raw]
+            text:
+              type: string
+            html:
+              type: string
+    QueueReceipt:
+      type: object
+      required: [id, status, duplicate]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [queued]
+        duplicate:
+          type: boolean
+    MessageStatus:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [queued, processing, accepted, failed, expired, unknown]
+        kind:
+          type: string
+          enum: [otp, raw]
+        createdAt:
+          type: integer
+          description: Unix milliseconds
+        updatedAt:
+          type: integer
+          description: Unix milliseconds

@@ -1,0 +1,32 @@
+name: couriermesh
+services:
+  gateway:
+    build: .
+    image: couriermesh:local
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_PATH: /data/couriermesh.db
+      SMTP_CERT: /data/tls/smtp.crt
+      SMTP_KEY: /data/tls/smtp.key
+      SMTP_REQUIRE_TLS: 'true'
+    ports:
+      - '127.0.0.1:8080:8080'
+    expose:
+      - '2525'
+    volumes:
+      - couriermesh-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - backend
+networks:
+  backend:
+    driver: bridge
+volumes:
+  couriermesh-data:
