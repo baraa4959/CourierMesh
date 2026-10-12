@@ -8,17 +8,17 @@
 - [ ] Persistent `/data` volume is mounted and backed up, encryption key securely backed up separately.
 - [ ] Sending domain verified with active provider and SPF/DKIM/DMARC aligned.
 - [ ] At least one provider enabled with realistic daily, hourly and rolling 30-day limits.
-- [ ] Real OTP delivered to one Gmail address and one Outlook/education mailbox.
-- [ ] Rate limits on your user registration and OTP resend endpoints configured.
+- [ ] Test messages delivered to at least two controlled inboxes using different recipient providers.
+- [ ] Rate limits on application endpoints that trigger email configured (including verification resends, if enabled).
 - [ ] Test account disabled; application key is sender-scoped.
 - [ ] Acceptance throughput and quota capacity tested with a **small** controlled batch (never send 1,000 test messages to random recipients).
 - [ ] Delivery failure / quota / unknown states handled visibly in the application.
 
-## Capacity planning for an initial 1,000-student registration day
+## Capacity planning for a 1,000-message traffic spike
 
-This project **does not create additional free provider capacity**. The sum of approved provider capacities must independently support the projected 1,000 valid sends (and resend reserve). Quotas configured in the dashboard do not raise upstream provider caps. If a provider supports 100 messages/day, it can never legitimately send 300/day just because the gateway is configured to allow it. Use provider support channels to confirm burst acceptance on new accounts.
+This project **does not create additional free provider capacity**. The sum of approved provider capacities must independently support the projected 1,000 valid messages (plus any retry or resend reserve). Quotas configured in the dashboard do not raise upstream provider caps. If a provider supports 100 messages/day, it can never legitimately send 300/day just because the gateway is configured to allow it. Use provider support channels to confirm burst acceptance on new accounts.
 
-For example, 1,000 emails in 10 minutes is an average of 1.67 handoffs/second, *excluding resends*. With six parallel workers, a queue deadline of 10 minutes, and provider requests taking 1–2 seconds, processing is feasible only if the upstream hourly/daily quotas also allow it. Benchmark with actual accounts before launch.
+For example, 1,000 outbound emails in 10 minutes is an average of 1.67 handoffs/second, *excluding resends*. With six parallel workers, a queue deadline of 10 minutes, and provider requests taking 1–2 seconds, processing is feasible only if the upstream hourly/daily quotas also allow it. Benchmark with actual accounts before launch.
 
 ## Backups
 
