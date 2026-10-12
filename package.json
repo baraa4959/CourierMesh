@@ -1,8 +1,8 @@
 {
   "name": "couriermesh",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "description": "A self-hosted, quota-aware transactional email gateway with SMTP and HTTPS API inputs.",
+  "description": "Self-hosted OTP-only email gateway with private templates and six HTTPS provider adapters.",
   "type": "module",
   "engines": { "node": ">=22.13.0" },
   "scripts": { "start": "node --disable-warning=ExperimentalWarning src/main.js", "dev": "node --watch --disable-warning=ExperimentalWarning src/main.js", "test": "node --test tests/*.test.js", "check": "node --check src/main.js && node --check src/store.js && node --check src/providers.js && node --check src/smtp.js && node --check src/http.js" },

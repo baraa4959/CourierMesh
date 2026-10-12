@@ -1,111 +1,59 @@
-# API and SMTP reference
+# OTP-only API and SMTP reference
+
+CourierMesh accepts **verification codes only**. `kind: "raw"`, arbitrary HTML/text sending and SMTP messages without a verification header are rejected.
 
 ## Authentication
 
-The administrator enters `ADMIN_TOKEN` in the dashboard to authenticate `/admin/*` using the HTTP `Authorization: Bearer` header. The token is kept in browser-tab memory only. Treat the admin endpoint as sensitive and put it behind HTTPS and optionally network access controls.
+The admin dashboard uses the operator's `ADMIN_TOKEN` on `/admin/*`. Applications get a distinct key through **API & SMTP Keys**. The secret is shown once, in the `KEY_ID.SECRET` format.
 
-An application key is generated from the dashboard. **Copy it immediately**. It consists of `KEY_ID.SECRET`; the backend stores a SHA-256 verifier and never reveals the secret again. Each key has an `allowedFrom` address, or `*` if you deliberately want all verified sender addresses.
+- HTTP: `Authorization: Bearer KEY_ID.SECRET`
+- SMTP: username `KEY_ID` and password `SECRET` after STARTTLS
 
-**HTTP API:**
-
-```
-Authorization: Bearer KEY_ID.SECRET
-```
-
-**SMTP authentication:**
-
-```
-username: KEY_ID
-password: SECRET
-```
+Store application secrets on your **backend**, never in a browser or mobile client.
 
 ## POST /v1/send
 
-Accept a message asynchronously. Returns `202 Accepted` with a durable message ID. The gateway will subsequently attempt provider handoff.
+```http
+POST /v1/send
+Content-Type: application/json
+Authorization: Bearer KEY_ID.SECRET
+Idempotency-Key: signup-123-attempt-1
+```
 
 ```json
 {
   "kind": "otp",
-  "to": "recipient@example.net",
   "from": "no-reply@notify.example.com",
-  "subject": "Verify your email address",
-  "code": "123456",
-  "variables": {"appName": "Example App"}
+  "to": "recipient@example.net",
+  "code": "123456"
 }
 ```
 
-For ordinary messages, use `kind=raw` and provide `text` and/or `html`:
+`kind` can be omitted, but if supplied it must be `otp`. `code` is required (4–24 alphanumeric, underscore or dash characters). Optional `variables` are forwarded to Loops for its published transactional template. `subject`, `text` and `html` are not configurable by the sender: the gateway uses the saved private template for the five non-Loops providers; Loops uses its published template.
 
-```json
-{
-  "kind": "raw",
-  "to": "recipient@example.net",
-  "from": "no-reply@notify.example.com",
-  "subject": "Welcome",
-  "text": "Your account is ready."
-}
-```
+On acceptance, HTTP returns `202` with `{ "id": "...", "status": "queued", "duplicate": false }`. This does **not** mean the email reached the recipient. Poll `GET /v1/messages/{id}` using the same application token.
 
-The `Idempotency-Key` header is recommended to prevent duplicate queue submissions from application retries. Keys must be at most 120 characters and may contain alphanumerics, underscore, colon, period or dash. Idempotency is scoped to the caller's application key, and stored with job history. A repeated key returns the existing message ID and `duplicate=true`. Supply a new key if the user explicitly requests a *new* OTP code.
+`Idempotency-Key` prevents accidental double queueing, is scoped to the application key and must be at most 120 characters (letters, numbers, `_`, `.`, `:`, `-`). A conflicting request returns `409`. Use a new key for a new OTP attempt.
 
-**Expected response**
-
-```json
-{"id":"550e8400-e29b-41d4-a716-446655440000","status":"queued","duplicate":false}
-```
-
-**HTTP status codes:** `202` queued; `400` validation; `401` invalid token; `403` forbidden sender; `429` request throttled; `503` queue full.
+Response codes: `202` queued; `400` invalid/non-OTP message; `401` invalid token; `403` unauthorized sender; `409` idempotency conflict; `429` rate limited; `503` queue full.
 
 ## GET /v1/messages/{id}
 
-Accessible only to the same application key that created the message. Responses contain status and timestamps, never message body, recipient or OTP code.
+States: `queued`, `processing`, `accepted` (provider accepted), `failed`, `expired`, `unknown` (ambiguous provider outcome, not automatically resent).
 
-| Status | Meaning |
-|---|---|
-| `queued` | Persisted, awaiting an eligible provider and worker |
-| `processing` | Provider call underway |
-| `accepted` | Provider API accepted handoff (inbox delivery not guaranteed) |
-| `failed` | No enabled eligible provider with available daily / monthly capacity or compatible format |
-| `expired` | Message exceeded queue TTL |
-| `unknown` | Request outcome was ambiguous; never automatically resent |
+## Admin template endpoints
 
-## Admin endpoints
+All require `Authorization: Bearer ADMIN_TOKEN` over HTTPS.
 
-The dashboard consumes these token-protected endpoints:
+- `GET /admin/otp-template`: `{ "configured": false, "template": null }` when no template is saved; otherwise includes the decrypted template **for the authenticated administrator only**.
+- `PUT /admin/otp-template`: save `{ "subject": "...", "text": "...{{code}}...", "html": "...{{code}}...", "direction": "rtl" }`. HTML is optional, but a code marker must appear in both text and custom HTML.
 
-| Endpoint | Purpose |
-|---|---|
-| `GET /admin/session` | Validate admin token |
-| `GET /admin/stats` | Quotas, provider status, message counts |
-| `POST /admin/test-send` | Send one real test OTP from the dashboard |
-| `GET /admin/providers` | Provider list without secrets |
-| `POST /admin/providers` | Add provider |
-| `PATCH /admin/providers/:id` | Update provider configuration |
-| `DELETE /admin/providers/:id` | Delete unused provider, or disable provider with history |
-| `GET /admin/keys` | List keys without secrets |
-| `POST /admin/keys` | Create a new key; secret returned **once** |
-| `DELETE /admin/keys/:id` | Revoke key |
-| `GET /admin/messages` | Redacted recent activity |
+Templates are stored encrypted in the persistent SQLite database, not source control. See [Private OTP templates](PRIVATE-OTP-TEMPLATES.md).
 
-For provider management, valid `type`s are `loops`, `resend`, `brevo`, `mailjet`, `smtp2go`, `sendpulse`. Config must include `name`, `priority`, `enabled`, `dailyLimit`, `monthlyLimit`, `hourlyLimit`, `minuteLimit`, and type-dependent `credentials`:
+Other admin endpoints: `GET /admin/session`, `GET /admin/stats`, `POST /admin/test-send`, `GET/POST /admin/providers`, `PATCH/DELETE /admin/providers/:id`, `GET/POST /admin/keys`, `DELETE /admin/keys/:id`, and `GET /admin/messages`.
 
-- Loops: `apiKey`, `transactionalId` (OTP) and optional `genericTransactionalId` for generic text mail; Loops templates must contain matching `{code}` or `{message}` and `{subject}` variables
-- Resend, Brevo, SMTP2GO: `apiKey`
-- Mailjet: `apiKey`, `secretKey`
-- SendPulse: `clientId`, `clientSecret`
+Provider credential types: Loops (`apiKey`, `transactionalId`), Resend/Brevo/SMTP2GO (`apiKey`), Mailjet (`apiKey`, `secretKey`) and SendPulse (`clientId`, `clientSecret`).
 
-A limit of zero disables **the local** limit. Manage upstream quotas separately. Credentials are never returned by list or edit endpoints. When patching a provider, omit credentials to preserve existing credentials; to rotate Mailjet/SendPulse credentials, supply the full pair.
+## SMTP OTP submission
 
-## SMTP submission
-
-Connect to SMTP port `2525` on a **private Docker network** with `EHLO`, `STARTTLS`, `AUTH PLAIN` or `AUTH LOGIN`, `MAIL FROM`, `RCPT TO`, `DATA`. Limitations are intentional:
-
-- Exactly **one recipient per message** (prevents accidental bulk blast and keeps quota accounting accurate).
-- MIME `text/plain`, `text/html`, and `multipart/alternative` supported for common clients. Large attachments, other MIME types and arbitrary relay extensions are unsupported.
-- The `From` header must match the `MAIL FROM` envelope, and `To` must match the sole `RCPT TO` address; sender must match key allowlist.
-- `AUTH` requires TLS unless explicitly disabled by the operator on an isolated network.
-- SMTP `250 Queued` means the message was durably recorded, **not delivered**.
-- `X-CourierMesh-OTP: 123456` makes an SMTP submission eligible for the Loops OTP adapter. Without this header, Loops can still send generic SMTP text if `genericTransactionalId` is configured with a published Loops template providing `{message}` and `{subject}` variables; otherwise it is skipped.
-- `X-CourierMesh-Variables: <base64-encoded-json>` optionally sets additional Loops variables; API clients should prefer native JSON.
-
-See [Examples](../examples/) for runnable integration samples.
+On private network port `2525`, use `EHLO`, `STARTTLS`, `AUTH`, `MAIL FROM`, `RCPT TO`, `DATA`. The SMTP email **must** include header `X-CourierMesh-OTP: 123456`. Its arbitrary body and subject are ignored; the centrally managed templates determine content. Exactly one recipient is supported. Attachments are not supported. Keep the submission port private; HTTPS REST API is the recommended method.

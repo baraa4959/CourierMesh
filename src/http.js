@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {dirname,resolve} from 'node:path';
 import {randomBytes} from 'node:crypto';
 import {constantEqual,fingerprint} from './crypto.js';
-import {email,validateMessage,TYPES} from './validate.js';
+import {email,validateMessage} from './validate.js';
 const base=resolve(dirname(fileURLToPath(import.meta.url)),'../public');
 const allowedFiles={'/':'index.html','/assets/app.js':'app.js','/assets/style.css':'style.css','/assets/logo.svg':'logo.svg'};
 const mimetypes={'.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','other':'text/html; charset=utf-8'};
@@ -26,7 +26,9 @@ const server=http.createServer(async(req,res)=>{
    if(!constantEqual(token,cfg.adminToken))return reply(res,401,{error:'Unauthorized'});
    if(!allowRate('admin:'+req.socket.remoteAddress,300))return reply(res,429,{error:'Too many requests'});
    if(path==='/admin/session' && req.method==='GET')return reply(res,200,{authenticated:true});
-   if(path==='/admin/test-send' && req.method==='POST'){const msg=validateMessage(await body(req),cfg);if(msg.kind!=='otp')return reply(res,400,{error:'Admin test sends OTP only'});return reply(res,202,store.enqueue(msg,{id:'admin'},`test-${randomBytes(12).toString('hex')}`));}
+   if(path==='/admin/test-send' && req.method==='POST'){const msg=validateMessage(await body(req),cfg);return reply(res,202,store.enqueue(msg,{id:'admin'},`test-${randomBytes(12).toString('hex')}`));}
+   if(path==='/admin/otp-template'&&req.method==='GET')return reply(res,200,{configured:!!store.getOtpTemplate(),template:store.getOtpTemplate()});
+   if(path==='/admin/otp-template'&&req.method==='PUT')return reply(res,200,{configured:true,template:store.saveOtpTemplate(await body(req,84000))});
    if(path==='/admin/stats' && req.method==='GET')return reply(res,200,store.stats());
    if(path==='/admin/providers' && req.method==='GET')return reply(res,200,store.listProviders());
    if(path==='/admin/providers' && req.method==='POST')return reply(res,201,store.createProvider(await body(req)));
@@ -60,7 +62,7 @@ const server=http.createServer(async(req,res)=>{
  }
  return reply(res,404,{error:'Not found'});
  }catch(e){const message=e.message??'Internal error';if(message==='IDEMPOTENCY_CONFLICT')return reply(res,409,{error:'Idempotency key already used with different message'});if(message==='QUEUE_FULL')return reply(res,503,{error:'Queue at capacity'},{'Retry-After':'30'});
-   if(/Invalid|Unsupported|required|not found|must|oversized|too large|too many|Sender|Quota|key name|provider name|credentials|API key/i.test(message))return reply(res,400,{error:message.replace(/\b(apiKey|secretKey|clientSecret)\b/g,'credential')});
+   if(/Invalid|Unsupported|required|not found|must|oversized|too large|too many|Sender|Quota|key name|provider name|credentials|API key|Template|OTP messages|Raw email|Unsafe HTML/i.test(message))return reply(res,400,{error:message.replace(/\b(apiKey|secretKey|clientSecret)\b/g,'credential')});
    console.error(JSON.stringify({event:'http_error',error:message}));return reply(res,500,{error:'Internal server error'});
  }
 });server.listen(cfg.httpPort,cfg.httpHost);return server;

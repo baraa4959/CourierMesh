@@ -17,7 +17,8 @@ export function parseMime(raw,cfg){const normalized=raw.replace(/\r\n/g,'\n');co
  if(boundary){for(const part of body.split('--'+boundary)){const p=part.replace(/^\r?\n/,'');const ix=p.indexOf('\n\n');if(ix<0)continue;const meta=p.slice(0,ix).toLowerCase(),payload=p.slice(ix+2).replace(/\n--$/,'').trimEnd();if(/content-disposition:\s*attachment|filename\s*=/i.test(meta))throw Error('Attachments unsupported');const enc=meta.match(/content-transfer-encoding:\s*([\w-]+)/)?.[1];if(/content-type:\s*text\/html/.test(meta))html=decoded(payload,enc);else if(/content-type:\s*text\/plain/.test(meta))text=decoded(payload,enc);}}
  else {const enc=headers['content-transfer-encoding'];if(/text\/html/i.test(contentType))html=decoded(body,enc);else if(/text\/plain/i.test(contentType))text=decoded(body,enc);else throw Error('Unsupported MIME type');}
  const otp=headers['x-couriermesh-otp'];const varsHeader=headers['x-couriermesh-variables'];let variables={};if(varsHeader){try{variables=JSON.parse(Buffer.from(varsHeader,'base64').toString('utf8'));}catch{throw Error('Invalid variables header');}}
- return validateMessage(otp?{kind:'otp',from,to,subject,code:otp,variables}:{kind:'raw',from,to,subject,text,html},cfg);
+ if(!otp)throw Error('OTP messages only; X-CourierMesh-OTP header required');
+ return validateMessage({kind:'otp',from,to,code:otp,variables},cfg);
 }
 export function smtpServer(store,cfg){
  if(!cfg.smtpEnabled)return null;

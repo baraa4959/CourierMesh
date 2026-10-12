@@ -1,13 +1,16 @@
-import {renderMessage} from './validate.js';
+import {renderOtpTemplate} from './otp-template.js';
 /** A successful HTTP response is merely provider acceptance, never proof of mailbox delivery. */
 export async function deliver(job, options={}) {
- const {provider}=job, m=renderMessage(job.message), cred=provider.credentials;
+ if(job.message.kind!=='otp')return {kind:'rejected',reason:'OTP messages only'};
+ const {provider}=job, cred=provider.credentials;
+ if(provider.type!=='loops'&&!job.template)return {kind:'rejected',reason:'OTP template not configured'};
+ const m=provider.type==='loops'?job.message:renderOtpTemplate(job.message,job.template);
  const timeout=options.timeoutMs??12000;const transport=options.fetchImpl??fetch;
  let url,body,headers={'content-type':'application/json','accept':'application/json'};
  switch(provider.type){
  case 'loops':
    url='https://app.loops.so/api/v1/transactional';headers.Authorization=`Bearer ${cred.apiKey}`;
-   body=m.kind==='otp'?{transactionalId:cred.transactionalId,email:m.to,addToAudience:false,dataVariables:{...m.variables,code:m.code}}:{transactionalId:cred.genericTransactionalId,email:m.to,addToAudience:false,dataVariables:{subject:m.subject,message:m.text||m.html.replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim()}};break;
+   body={transactionalId:cred.transactionalId,email:m.to,addToAudience:false,dataVariables:{...m.variables,code:m.code}};break;
  case 'resend':
    url='https://api.resend.com/emails';headers.Authorization=`Bearer ${cred.apiKey}`;
    headers['Idempotency-Key']=`couriermesh/${job.id}`;

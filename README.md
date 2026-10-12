@@ -6,7 +6,7 @@
 
 **One endpoint. Six delivery adapters. Your limits, under control.**
 
-An open-source, self-hosted email delivery gateway for any application: transactional messages, notifications, verification codes, receipts, and alerts. Deploy on a single VM without a paid database, Redis queue, or proprietary backend.
+An open-source, self-hosted, **OTP-only** email delivery gateway for any application requiring verification codes. Deploy on a single VM without a paid database, Redis queue, or proprietary backend.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg) ![Node](https://img.shields.io/badge/node-22%2B-339933) ![Docker](https://img.shields.io/badge/deployment-Docker-2496ed) ![SMTP](https://img.shields.io/badge/SMTP-STARTTLS-35bfaa) ![Providers](https://img.shields.io/badge/providers-6-8475ef)
 
@@ -18,7 +18,7 @@ An open-source, self-hosted email delivery gateway for any application: transact
 
 ## Why CourierMesh?
 
-Connect applications to multiple email delivery providers without exposing an outbound SMTP port 25 dependency. CourierMesh accepts messages through **one authenticated HTTPS API** or **one internal SMTP endpoint**, then hands them to whichever configured provider has available capacity.
+Connect applications to multiple email delivery providers without exposing an outbound SMTP port 25 dependency. CourierMesh accepts OTP messages through **one authenticated HTTPS API** or **one internal SMTP endpoint**, then hands them to whichever configured provider has available capacity.
 
 It does not bypass the terms, approval requirements, abuse checks, or quotas imposed by a provider. Your account is responsible for ensuring that its sending volume and domain authorization are valid.
 
@@ -34,7 +34,7 @@ It does not bypass the terms, approval requirements, abuse checks, or quotas imp
 | Safety | No retry if provider acceptance is uncertain |
 | Access | Scoped application keys, one-time token display, sender allowlist |
 | Visibility | Browser admin console, message states, quota meters, provider list |
-| Encryption | AES-256-GCM encryption for provider credentials and queued email bodies |
+| Encryption | AES-256-GCM encryption for provider credentials, private OTP templates and queued OTP payloads |
 | Infrastructure | Docker, Easypanel, SQLite, one service |
 | Privacy | No analytics, no tracking pixels, no marketing list synchronization |
 
@@ -85,9 +85,10 @@ Open the admin console on `http://127.0.0.1:8080` through an HTTPS reverse proxy
 
 1. Sign in using your `ADMIN_TOKEN`.
 2. Add and enable a provider with verified sending domain, API credentials, and quotas.
-3. Create an application key with an exact authorized sender address.
-4. Connect via HTTPS API (best for OTP) or authenticated private-network SMTP.
-5. Run a real single-recipient acceptance and inbox test before sending production traffic.
+3. Configure your private OTP subject, text, and optional HTML under **OTP Template**. Nothing you enter there is committed to GitHub.
+4. Create an application key with an exact authorized sender address.
+5. Connect via HTTPS API (preferred) or authenticated private-network SMTP with `X-CourierMesh-OTP` header.
+6. Run a real single-recipient acceptance and inbox test before sending production traffic.
 
 For Easypanel instructions, persistent storage, networking, TLS trust, and deployment constraints, see [Deployment](docs/DEPLOYMENT.md).
 
@@ -95,14 +96,16 @@ For Easypanel instructions, persistent storage, networking, TLS trust, and deplo
 
 | Adapter | Input | Provider account prerequisites | Typical purpose |
 |---|---|---|---|
-| **Loops** | OTP template; optional generic text template | API key + published OTP transaction ID; optional generic template ID | Verification codes, optional generic SMTP text bridging |
-| **Resend** | OTP / raw | API key + verified sender/domain | General transactional messages |
-| **Brevo** | OTP / raw | API key + verified sender/domain | General transactional messages |
-| **Mailjet** | OTP / raw | Public API key + private secret + verified sender | General transactional messages |
-| **SMTP2GO** | OTP / raw | API key + verified sender | General transactional messages |
-| **SendPulse** | OTP / raw | API client ID + secret + approved SMTP account | General transactional messages |
+| **Loops** | OTP | API key and published OTP transactional ID | Provider-side OTP template |
+| **Resend** | OTP | API key and verified sender/domain | Private gateway OTP template |
+| **Brevo** | OTP | API key and verified sender/domain | Private gateway OTP template |
+| **Mailjet** | OTP | API key, secret and verified sender | Private gateway OTP template |
+| **SMTP2GO** | OTP | API key and verified sender | Private gateway OTP template |
+| **SendPulse** | OTP | API client ID, secret and approved account | Private gateway OTP template |
 
-**Loops exception:** Loops only accepts published transactional templates; it is *not* a free-form SMTP relay. For OTP, create and publish a template with the case-sensitive `{code}` variable and either use the HTTPS API or `X-CourierMesh-OTP` SMTP header. To route ordinary SMTP text emails through Loops without changing your SMTP client, optionally configure a **generic text transactional template ID** whose body uses `{message}` and whose subject uses `{subject}`. The gateway injects those variables (HTML layout is not preserved). Without this second template, ordinary SMTP mail uses the five raw-capable adapters.
+**Private template:** configure the subject, text, optional HTML and RTL/LTR direction in the admin dashboard. Use `{{code}}` for dynamic substitution. The template content stays AES-256-GCM-encrypted in SQLite under your private persistent `/data` volume, never in GitHub. The five non-Loops adapters all use this same template. Loops retains its separate published template and cannot automatically sync its HTML. See [Private OTP templates](docs/PRIVATE-OTP-TEMPLATES.md).
+
+**OTP-only:** REST submissions containing `kind: raw`, `text` or `html` are rejected. SMTP clients must supply `X-CourierMesh-OTP`, and arbitrary SMTP mail is rejected. No receipts, marketing campaigns, notifications or general mail are permitted by this gateway.
 
 ### Conservative dashboard defaults (verify against your plan)
 
@@ -117,23 +120,17 @@ For Easypanel instructions, persistent storage, networking, TLS trust, and deplo
 
 These defaults are *locally configured safety budgets*, **not** verified account entitlements. Provider offers, rate limits, account status and terms change. The monthly cap is a conservative **rolling 30-day window**. Daily resets at **00:00 UTC**. A zero cap means *no local cap*—it does not change the provider's own cap. Set more restrictive numbers for new/unapproved accounts.
 
-## Send an email (HTTPS)
+## Send an OTP (HTTPS)
 
 ```bash
 curl -X POST https://mail-gateway.example.com/v1/send \
   -H 'Authorization: Bearer KEY_ID.SECRET' \
-  -H 'Idempotency-Key: receipt-order-123' \
+  -H 'Idempotency-Key: signup-user-123' \
   -H 'Content-Type: application/json' \
-  -d '{
-    "kind": "raw",
-    "from": "no-reply@notify.example.com",
-    "to": "recipient@example.net",
-    "subject": "Your order receipt",
-    "text": "Thanks for your order! Your receipt is ready."
-  }'
+  -d '{"kind":"otp","from":"no-reply@notify.example.com","to":"recipient@example.net","code":"123456"}'
 ```
 
-For one-time passcodes, email verification, or password resets, use `kind: "otp"` with a `code` field and an optional `variables` object. Both modes use the same authenticated endpoint; choose a provider that supports the selected message type. See [API and SMTP](docs/API.md) for complete examples. Loops requires a published transactional template; it does not send free-form email unless a generic template is configured.
+The sender does not specify the email's subject or message body; the central template controls them. Loops uses its published OTP transactional template, while the other five providers use the private gateway template. See [API reference](docs/API.md).
 
 ```json
 {"id":"75f...","status":"queued","duplicate":false}
@@ -177,16 +174,6 @@ MIT licensed. Contributions are welcome: see [Contributing](CONTRIBUTING.md), [C
 
 The repository includes unit/integration tests with simulated provider responses and a functional local SMTP/API path. **Live provider delivery, real-world DNS alignment, Easypanel deployment, load testing, independent security review, and 1,000-user launch validation still require real accounts and deployment access.** Do not assume a provider's acceptance response means the message reached the inbox.
 
-## Publish to GitHub
+## GitHub and private content
 
-This source archive is deliberately not attached to a specific GitHub user or organization. To publish it under your own account:
-
-```bash
-git init -b main
-git add .
-git commit -m "Release CourierMesh 1.0.0"
-# Install and authenticate GitHub CLI first:
-gh repo create couriermesh --public --source=. --remote=origin --push
-```
-
-Set the GitHub repository description to **"Self-hosted, quota-aware email gateway with six provider adapters, SMTP submission and a secure HTTP API."** Enable branch protection and security advisories before inviting contributors. Do not commit `.env`, private SMTP certificates, or runtime data.
+Only code, generic examples and documentation belong in this public repository. Keep your actual OTP message content in the **OTP Template** settings on the running server, backed by a persistent and backed-up `/data` volume. Never commit `.env`, production templates, private TLS keys or the encryption key. The project's public source may be reused without reproducing anyone's private template.

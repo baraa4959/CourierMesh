@@ -5,8 +5,8 @@ async function call(path,{method='GET',data}={}) { const r=await fetch(path,{met
 function toast(msg){$('#toast').textContent=msg;setTimeout(()=>$('#toast').textContent='',5000);}
 function rowTable(head,rows){const wrap=el('div','table-wrap'),table=el('table'),thead=el('thead'),tr=el('tr');head.forEach(h=>tr.append(el('th','',h)));thead.append(tr);table.append(thead);const tbody=el('tbody');for(const cells of rows){const r=el('tr');cells.forEach(c=>{const td=el('td');if(c instanceof Node)td.append(c);else td.textContent=String(c);r.append(td);});tbody.append(r);}if(!rows.length){const td=el('td','','No records yet.');td.colSpan=head.length;const row=el('tr');row.append(td);tbody.append(row);}table.append(tbody);wrap.append(table);return wrap;}
 function controls(...items){const div=el('div');items.forEach(({label,run,kind})=>{const b=el('button',kind||'secondary',label);b.addEventListener('click',run);div.append(b);});return div;}
-function setTab(tab){selectedTab=tab;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.id===tab));$('#title').textContent=({overview:'Overview',providers:'Providers',keys:'API & SMTP keys',activity:'Activity',guide:'Integration guide'})[tab];}
-document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
+function setTab(tab){selectedTab=tab;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.id===tab));$('#title').textContent=({overview:'Overview',providers:'Providers',template:'OTP Template',keys:'API & SMTP keys',activity:'Activity',guide:'Integration guide'})[tab];}
+document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>{setTab(b.dataset.tab);if(b.dataset.tab==='template'&&token)loadOtpTemplate().catch(e=>toast(e.message));}));
 function gauge(n,max){const box=el('div');box.append(el('span','',max?`${n} / ${max}`:`${n} (unlimited)`));const meter=el('div','meter');const fill=el('div');fill.style.width=`${max?Math.min(100,n/max*100):0}%`;meter.append(fill);box.append(meter);return box;}
 function render(){const entries=[['Queued',stats.messages?.queued||0],['Accepted',stats.messages?.accepted||0],['Unknown delivery',stats.messages?.unknown||0],['Active providers',providers.filter(x=>x.enabled).length]];
 $('#metrics').replaceChildren(...entries.map(([label,n])=>{const m=el('div','metric');m.append(el('label','',label),el('strong','',n));return m;}));
@@ -21,7 +21,7 @@ $('#login').addEventListener('submit',async e=>{e.preventDefault();token=$('#adm
 $('#logout').addEventListener('click',()=>{token='';$('#dashboard').hidden=true;$('#locked').hidden=false;$('#status').textContent='Locked';$('#status').classList.remove('online');});
 $('#refresh').addEventListener('click',()=>{if(token)refresh().catch(e=>toast(e.message));});
 const presets={loops:[0,4000,600,8],resend:[100,3000,100,4],brevo:[300,9000,300,5],mailjet:[200,6000,200,3],smtp2go:[200,1000,200,3],sendpulse:[400,12000,50,1]};
-const fields={loops:[['apiKey','API key'],['transactionalId','Published OTP transactional ID'],['genericTransactionalId','Published generic-message template ID (optional)']],resend:[['apiKey','API key']],brevo:[['apiKey','API key']],mailjet:[['apiKey','Public API key'],['secretKey','Private API secret']],smtp2go:[['apiKey','API key']],sendpulse:[['clientId','Client ID'],['clientSecret','Client secret']]};
+const fields={loops:[['apiKey','API key'],['transactionalId','Published OTP transactional ID']],resend:[['apiKey','API key']],brevo:[['apiKey','API key']],mailjet:[['apiKey','Public API key'],['secretKey','Private API secret']],smtp2go:[['apiKey','API key']],sendpulse:[['clientId','Client ID'],['clientSecret','Client secret']]};
 function addField(node,label,name,value='',type='text',required=true){const l=el('label','',label),input=el('input');input.name=name;input.value=value;input.type=type;input.required=required;if(type==='password')input.autocomplete='new-password';l.append(input);node.append(l);return input;}
 function openModal(title,contents,onSave){$('#modal-title').textContent=title;$('#modal-error').textContent='';const target=$('#modal-fields');target.replaceChildren();contents(target);$('#modal-form').onsubmit=async ev=>{ev.preventDefault();$('#modal-save').disabled=true;try{const data=Object.fromEntries(new FormData($('#modal-form')).entries());await onSave(data);$('#modal').close();await refresh();toast('Saved successfully');}catch(e){$('#modal-error').textContent=e.message;}finally{$('#modal-save').disabled=false;}};$('#modal').showModal();}
 $('#modal-cancel').addEventListener('click',()=>$('#modal').close());
@@ -30,12 +30,12 @@ function showProvider(existing){openModal(existing?'Edit provider':'Add a sendin
  addField(target,'Display name','name',existing?.name||'');const cols=el('div','cols');addField(cols,'Priority (lower = first)','priority',existing?.priority??100,'number');const defaultCaps=presets[select.value];addField(cols,'Daily limit (0 = unlimited)','dailyLimit',existing?.dailyLimit??defaultCaps[0],'number');addField(cols,'Rolling 30 day limit','monthlyLimit',existing?.monthlyLimit??defaultCaps[1],'number');addField(cols,'Per hour limit','hourlyLimit',existing?.hourlyLimit??defaultCaps[2],'number');addField(cols,'Per minute limit','minuteLimit',existing?.minuteLimit??defaultCaps[3],'number');target.append(cols);
  const checkbox=el('label','');checkbox.textContent='Active  ';const input=el('input');input.type='checkbox';input.name='enabled';input.checked=existing?.enabled??true;input.style.width='auto';checkbox.prepend(input);target.append(checkbox);
  target.append(el('h3','','Credentials'));const credBox=el('div');target.append(credBox);
- const updateCred=()=>{credBox.replaceChildren();for(const [key,label] of fields[select.value])addField(credBox,label,key,'','password',!existing && key!=='genericTransactionalId');if(!existing){const [day,month,hour,minute]=presets[select.value];for(const [name,value] of Object.entries({dailyLimit:day,monthlyLimit:month,hourlyLimit:hour,minuteLimit:minute}))target.querySelector(`[name=${name}]`).value=value;}};select.addEventListener('change',updateCred);updateCred();
+ const updateCred=()=>{credBox.replaceChildren();for(const [key,label] of fields[select.value])addField(credBox,label,key,'','password',!existing && true);if(!existing){const [day,month,hour,minute]=presets[select.value];for(const [name,value] of Object.entries({dailyLimit:day,monthlyLimit:month,hourlyLimit:hour,minuteLimit:minute}))target.querySelector(`[name=${name}]`).value=value;}};select.addEventListener('change',updateCred);updateCred();
  },async data=>{
  const type=existing?.type||data.type,credentials={};for(const [k] of fields[type])if(data[k])credentials[k]=data[k];
  const payload={name:data.name,type,priority:Number(data.priority),dailyLimit:Number(data.dailyLimit),monthlyLimit:Number(data.monthlyLimit),hourlyLimit:Number(data.hourlyLimit),minuteLimit:Number(data.minuteLimit),enabled:data.enabled==='on'};
  if(Object.keys(credentials).length)payload.credentials=credentials;
- if(!existing&&fields[type].some(([k])=>k!=='genericTransactionalId'&&!credentials[k]))throw Error('Required credentials are missing');
+ if(!existing&&fields[type].some(([k])=>!credentials[k]))throw Error('Required credentials are missing');
  await call(existing?`/admin/providers/${existing.id}`:'/admin/providers',{method:existing?'PATCH':'POST',data:payload});
  });}
 $('#add-provider').addEventListener('click',()=>showProvider());
@@ -43,3 +43,17 @@ $('#add-key').addEventListener('click',()=>{openModal('Create application key',n
 setInterval(()=>{if(token&&selectedTab==='overview')refresh().catch(()=>{});},20000);
 
 $('#test-send').addEventListener('submit',async e=>{e.preventDefault();const btn=e.currentTarget.querySelector('button');btn.disabled=true;const d=Object.fromEntries(new FormData(e.currentTarget));try{const code=String(100000+(crypto.getRandomValues(new Uint32Array(1))[0]%900000));const response=await call('/admin/test-send',{method:'POST',data:{kind:'otp',from:d.from,to:d.to,code,subject:'CourierMesh verification test'}});$('#test-result').textContent=`Queued test message ${response.id}. Check Activity for the provider handoff and your inbox for delivery.`;await refresh();}catch(err){$('#test-result').textContent=err.message;}finally{btn.disabled=false;}});
+
+async function loadOtpTemplate(){
+ const data=await call('/admin/otp-template');
+ const form=$('#otp-template-form');
+ const tpl=data.template||{subject:'',text:'',html:'',direction:'rtl'};
+ for(const field of ['subject','text','html','direction'])form.elements.namedItem(field).value=tpl[field]|| (field==='direction'?'rtl':'');
+ $('#template-state').textContent=data.configured?'Configured privately':'Not configured';
+}
+$('#otp-template-form').addEventListener('submit',async event=>{
+ event.preventDefault();const form=event.currentTarget;
+ const data=Object.fromEntries(new FormData(form));
+ try{await call('/admin/otp-template',{method:'PUT',data});$('#template-feedback').textContent='Private OTP template saved successfully.';await loadOtpTemplate();}
+ catch(e){$('#template-feedback').textContent=e.message;}
+});

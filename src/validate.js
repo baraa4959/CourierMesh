@@ -22,20 +22,13 @@ export function validateProvider(p, old={}) {
 function cap(n){const v=Number(n); if(!Number.isInteger(v)||v<0||v>100000000)throw Error('Quota must be a non-negative integer; 0 means unlimited');return v;}
 export function validateMessage(input, cfg){
  if(!input||typeof input!=='object'||Array.isArray(input))throw Error('Invalid message');
- const kind=input.kind ??'raw';if(!['otp','raw'].includes(kind))throw Error('kind must be otp or raw');
- const from=email(input.from); const to=email(input.to);
- if(cfg.allowFrom.length && !cfg.allowFrom.includes(from))throw Error('Sender not on ALLOWED_SENDERS list');
- const subject=input.subject??(kind==='otp'?'Your verification code':'');
- if(typeof subject!=='string'||subject.length<1||subject.length>180||/[\r\n]/.test(subject))throw Error('Invalid subject');
- if(kind==='otp') {
-   const code=String(input.code??'');if(!/^[\w\-]{4,24}$/.test(code))throw Error('OTP code must be 4-24 alphanumeric, dash, or underscore characters');
-   const variables=input.variables??{};
-   if(!variables||typeof variables!=='object'||Array.isArray(variables)||Object.keys(variables).length>15 ||Object.entries(variables).some(([k,v])=>!/^[\w-]{1,50}$/.test(k) || !['string','number'].includes(typeof v) || String(v).length>300))throw Error('Invalid template variables');
-   return {kind,from,to,subject,code,variables};
- }
- let text=input.text ?? '';let html=input.html ?? '';
- if(typeof text!=='string'||typeof html!=='string'||(text.length===0&&html.length===0)||Buffer.byteLength(text)+Buffer.byteLength(html)>cfg.maxMessageBytes)throw Error('Invalid or oversized email body');
- return {kind,from,to,subject,text,html};
+ if(input.kind!==undefined&&input.kind!=='otp')throw Error('OTP messages only');
+ if(input.text!==undefined||input.html!==undefined)throw Error('Raw email is disabled; OTP messages only');
+ const from=email(input.from),to=email(input.to);
+ if(cfg.allowFrom.length&&!cfg.allowFrom.includes(from))throw Error('Sender not on ALLOWED_SENDERS list');
+ const code=String(input.code??'');
+ if(!/^[\w\-]{4,24}$/.test(code))throw Error('OTP code must be 4-24 alphanumeric, dash, or underscore characters');
+ const variables=input.variables??{};
+ if(!variables||typeof variables!=='object'||Array.isArray(variables)||Object.keys(variables).length>15||Object.entries(variables).some(([k,v])=>!/^[\w-]{1,50}$/.test(k)||!['string','number'].includes(typeof v)||String(v).length>300))throw Error('Invalid template variables');
+ return {kind:'otp',from,to,code,variables};
 }
-export function escapeHtml(str) {return String(str).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-export function renderMessage(m) { if(m.kind==='raw')return m; const code=escapeHtml(m.code); return {...m,text:`Your verification code is: ${m.code}\nThis code expires soon. Never share it.`,html:`<div style="font-family:system-ui,sans-serif;max-width:500px;margin:auto;padding:24px"><h2>Verify your account</h2><p>Use the code below to continue:</p><p style="font-size:32px;font-weight:700;letter-spacing:5px">${code}</p><p>This code expires soon. Never share it with anyone.</p></div>`}; }

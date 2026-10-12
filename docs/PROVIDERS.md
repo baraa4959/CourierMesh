@@ -8,8 +8,7 @@ CourierMesh **does not create an account, bypass verification, or expand a provi
 2. Create and **publish** a transactional template for OTP; use the case-sensitive variable `code` in the message body.
 3. Copy its transactional ID and create an API key.
 4. In CourierMesh, select `Loops` and enter `apiKey` and `transactionalId`.
-5. Optional for unmodified SMTP clients: publish a second generic transactional template whose subject includes the variable `subject` and body includes the variable `message`. Enter its ID as `genericTransactionalId`. This sends text into a Loops-controlled layout; free-form HTML styling is not preserved.
-6. Test with a single controlled address. Loops recipients are **not** automatically enrolled in marketing audiences (`addToAudience:false`).
+5. Test with a single controlled address. No generic-message template is used; this gateway accepts OTP only. Loops recipients are **not** automatically enrolled in marketing audiences (`addToAudience:false`).
 
 Docs: [Loops transactional guide](https://app.loops.so/docs/transactional/guide).
 
@@ -55,6 +54,10 @@ Docs: [SMTP2GO standard email API](https://developers.smtp2go.com/reference/send
 5. Keep free plan budgets within SendPulse's hourly cap and daily cap. Their published free SMTP documentation mentions **50 emails/hour** and **400/day**, but account-specific limits can vary.
 
 Docs: [SendPulse SMTP API](https://web.sendpulse.com/latam/integrations/api/smtp), [SendPulse quota limits](https://web.sendpulse.com/knowledge-base/smtp/limits).
+
+## Private OTP template
+
+For Resend, Brevo, Mailjet, SMTP2GO, and SendPulse, configure a private OTP subject, text and optional HTML from the **OTP Template** tab before using these adapters. Actual template content is encrypted on the server and is never stored in GitHub. The `{{code}}` placeholder is required. Loops continues using its provider-hosted published OTP template. See [Private OTP templates](PRIVATE-OTP-TEMPLATES.md).
 
 ## Domain authentication rules
 
