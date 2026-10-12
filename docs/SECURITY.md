@@ -34,4 +34,4 @@ API tokens can be revoked individually from the dashboard. For an ADMIN_TOKEN ro
 
 ## Reporting vulnerabilities
 
-See [`../SECURITY.md`](../SECURITY.md). Do not publish API tokens, domain ownership verification records, SMTP credentials, private student data or exploit proof-of-concepts in public issue trackers.
+See [`../SECURITY.md`](../SECURITY.md). Do not publish API tokens, domain ownership verification records, SMTP credentials, private recipient data or exploit proof-of-concepts in public issue trackers.
