@@ -1,3 +1,11 @@
+## 1.2.1 — Bootstrap interface cleanup
+
+- Replaced the previous custom-styled administration console with locally bundled Bootstrap 5.3.6 components.
+- Removed decorative icons, all-caps marketing labels, promotional copy, duplicate headings and extra letter spacing from the interface.
+- Simplified navigation, tables, forms, login, templates and diagnostics while preserving all element IDs and REST/SMTP behavior.
+- Retained Arabic RTL and all four existing translations; no new external runtime dependency or database migration.
+- Added static UI integrity tests and visually checked dashboard rendering in English and Arabic at desktop/mobile sizes.
+
 # Changelog
 
 All notable changes to CourierMesh are documented here. Versioning follows [Semantic Versioning](https://semver.org/).

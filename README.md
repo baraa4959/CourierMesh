@@ -1,14 +1,10 @@
-<div align="center">
-  <img src="public/logo.svg" width="88" alt="CourierMesh logo" />
+# CourierMesh
 
-  # CourierMesh
+A self-hosted transactional email gateway with REST API and private SMTP input, six outbound HTTPS providers, an encrypted SQLite queue, and connection diagnostics.
 
-  **One endpoint. Flexible delivery. Complete control.**
+The admin interface uses **Bootstrap 5.3.6**, bundled locally under `public/vendor/bootstrap.min.css`. It does not load a CDN or require Bootstrap JavaScript. Supported languages are English, Arabic (RTL), French and Spanish.
 
-  A self-hosted transactional email gateway with a responsive admin console, six outbound HTTPS providers, a private SMTP receiver, durable SQLite queue, and a safe built-in connection test lab.
-
-  [Getting started](#quick-start) · [API reference](docs/API.md) · [Providers](docs/PROVIDERS.md) · [Deployment](docs/DEPLOYMENT.md) · [Diagnostics](docs/DIAGNOSTICS.md) · [Security](docs/SECURITY.md)
-</div>
+[API reference](docs/API.md) · [Providers](docs/PROVIDERS.md) · [Deployment](docs/DEPLOYMENT.md) · [Diagnostics](docs/DIAGNOSTICS.md) · [Security](docs/SECURITY.md)
 
 ## Features
 

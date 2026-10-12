@@ -1,45 +1,159 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f5f7fb"><title>CourierMesh · Delivery control</title><link rel="icon" type="image/svg+xml" href="/assets/logo.svg"><link rel="stylesheet" href="/assets/style.css"></head>
-<body>
-<div class="shell">
- <aside class="sidebar" aria-label="Main navigation">
-   <a class="brand" href="/" aria-label="CourierMesh"><img src="/assets/logo.svg" alt=""><span>CourierMesh<small>EMAIL INFRASTRUCTURE</small></span></a>
-   <div class="nav-label" data-t="workspace">WORKSPACE</div>
-   <nav id="navigation"><button type="button" class="nav-link current" data-view="overview"><span class="nav-icon">◫</span><span data-t="overview">Overview</span></button>
-   <button type="button" class="nav-link" data-view="providers"><span class="nav-icon">◇</span><span data-t="providers">Providers</span></button>
-   <button type="button" class="nav-link" data-view="diagnostics"><span class="nav-icon">◎</span><span data-t="diagnostics">Diagnostics</span></button>
-   <button type="button" class="nav-link" data-view="templates"><span class="nav-icon">▤</span><span data-t="templates">OTP template</span></button>
-   <button type="button" class="nav-link" data-view="credentials"><span class="nav-icon">⌘</span><span data-t="credentials">API & SMTP keys</span></button>
-   <button type="button" class="nav-link" data-view="activity"><span class="nav-icon">≋</span><span data-t="activity">Activity</span></button>
-   <button type="button" class="nav-link" data-view="guide"><span class="nav-icon">↗</span><span data-t="guide">Integration</span></button>
-   <button type="button" class="nav-link" data-view="security"><span class="nav-icon">⚿</span><span data-t="security">Security</span></button></nav>
-   <div class="sidebar-foot"><span class="status-dot"></span><span data-t="selfHosted">Self-hosted · Private by design</span></div>
- </aside>
- <main class="main">
-   <header class="topbar"><div><div class="eyebrow" data-t="console">CONTROL CENTER</div><h1 id="page-title" data-t="overview">Overview</h1><p id="page-subtitle" data-t="overviewIntro">Keep every transactional message under control.</p></div><div class="top-controls"><label class="language-label" for="language" data-t="language">Language</label><select id="language" aria-label="Language"><option value="en">English</option><option value="ar">العربية</option><option value="fr">Français</option><option value="es">Español</option></select><span id="connection" class="chip"><span class="status-dot"></span><span data-t="offline">Locked</span></span><button id="refresh" class="btn outline" type="button" data-t="refresh">Refresh</button><button id="lock" class="btn ghost" type="button" data-t="lock">Lock</button></div></header>
-   <section id="login-view" class="auth-layout"><div class="auth-card"><span class="auth-symbol">✉</span><h2 data-t="welcome">Welcome back</h2><p data-t="loginHint">Sign in to manage your private mail gateway.</p>
-     <form id="login-form" class="stack"><label><span data-t="username">Username</span><input name="username" autocomplete="username" required value="admin"></label><label><span data-t="password">Password</span><input name="password" type="password" autocomplete="current-password" required></label><button class="btn primary full" data-t="signIn" type="submit">Sign in</button></form>
-     <details id="legacy-entry"><summary data-t="legacySignIn">Use existing ADMIN_TOKEN</summary><form id="legacy-form" class="stack"><label><span data-t="adminToken">Administrator token</span><input name="token" type="password" autocomplete="off" minlength="32" required></label><button class="btn outline full" type="submit" data-t="unlock">Unlock dashboard</button></form></details>
-     <p id="login-error" class="message error" role="alert"></p>
-   </div></section>
-   <section id="password-view" class="auth-layout" hidden><div class="auth-card"><span class="auth-symbol">🔒</span><h2 data-t="changeRequired">Set your new password</h2><p data-t="passwordHint">Your temporary password must be changed before continuing. Use at least 12 characters with upper- and lowercase letters and a number.</p><form id="required-change-form" class="stack"><label><span data-t="currentPassword">Current password</span><input name="currentPassword" type="password" required autocomplete="current-password"></label><label><span data-t="newPassword">New password</span><input name="newPassword" type="password" required minlength="12" autocomplete="new-password"></label><button class="btn primary full" data-t="updatePassword">Change password</button></form><p id="password-error" class="message error" role="alert"></p></div></section>
-   <section id="dashboard" hidden>
-    <section class="page active" id="overview"><div class="stats" id="metrics"></div><div class="twocol"><article class="card"><div class="card-heading"><div><h2 data-t="routing">Provider routing</h2><p data-t="routingDesc">Priority-based delivery, with real-time local quota tracking.</p></div></div><div id="overview-provider-table"></div></article><article class="card"><div class="card-heading"><div><h2 data-t="sendTest">Send a real test message</h2><p data-t="sendTestDesc">Sends through your active providers. Use Diagnostics for a test that never leaves your server.</p></div></div><form id="test-form" class="stack"><label><span data-t="messageType">Message type</span><select name="kind" id="test-kind"><option value="otp">OTP</option><option value="raw">Email</option></select></label><div class="fields-2"><label><span data-t="sender">Sender</span><input type="email" name="from" required placeholder="no-reply@your-domain.com"></label><label><span data-t="recipient">Recipient</span><input type="email" name="to" required placeholder="you@example.com"></label></div><div id="real-test-raw" hidden><label><span data-t="subject">Subject</span><input name="subject" value="CourierMesh test message"></label><label><span data-t="body">Message body</span><textarea name="text" rows="3">This is a CourierMesh delivery test.</textarea></label></div><button class="btn primary" type="submit" data-t="sendTestButton">Send test message</button><p id="test-result" class="message" role="status"></p></form></article></div></section>
-    <section class="page" id="providers"><article class="card"><div class="card-heading"><div><h2 data-t="sendingProviders">Sending providers</h2><p data-t="providersIntro">Connect multiple providers without changing your applications.</p></div><button class="btn primary" id="provider-add" type="button" data-t="addProvider">+ Add provider</button></div><div id="providers-table"></div></article></section>
-    <section class="page" id="diagnostics"><div class="twocol"><article class="card"><div class="card-heading"><div><h2 data-t="captureMode">Connection test mode</h2><p data-t="captureInfo">Temporarily capture all inbound API and SMTP messages locally. Nothing is sent to email providers.</p></div></div><div class="diag-status" id="diagnostic-status"></div><p class="muted" data-t="automaticExpiry">Automatically turns off after 10 minutes to prevent accidental interruption of real mail.</p><div class="actions"><button id="diag-start" class="btn primary" type="button" data-t="startCapture">Enable for 10 minutes</button><button id="diag-stop" class="btn outline" type="button" data-t="stopCapture">Stop capture</button></div></article><article class="card"><div class="card-heading"><div><h2 data-t="singleProbe">Single-message dry run</h2><p data-t="singleProbeInfo">Use /v1/probe or dryRun: true. No provider call, even when capture mode is off.</p></div></div><pre class="code" id="probe-example"></pre><button id="copy-probe" class="btn outline" type="button" data-t="copyExample">Copy example</button></article></div><article class="card"><div class="card-heading"><div><h2 data-t="capturedRequests">Captured requests</h2><p data-t="privacyNote">Only metadata is stored; message bodies, verification codes and credentials are never recorded here.</p></div><button class="btn outline" id="diag-refresh" data-t="refresh">Refresh</button></div><div id="diagnostic-table"></div></article></section>
-    <section class="page" id="templates"><article class="card narrow"><div class="card-heading"><div><h2 data-t="privateOtp">Private OTP template</h2><p data-t="privateOtpDesc">Stored encrypted on your volume, never inside your public GitHub repository. Loops uses its own published OTP template.</p></div></div><form id="template-form" class="stack"><label><span data-t="subject">Subject</span><input name="subject" required maxlength="180" placeholder="Your verification code"></label><label><span data-t="plainText">Plain-text body</span><textarea name="text" rows="7" required placeholder="Your verification code is {{code}}"></textarea></label><label><span data-t="htmlOptional">HTML body (optional)</span><textarea name="html" rows="7" placeholder="&lt;div&gt;{{code}}&lt;/div&gt;"></textarea></label><label><span data-t="direction">Text direction</span><select name="direction"><option value="ltr">Left-to-right</option><option value="rtl">Right-to-left</option></select></label><p class="muted" data-t="templateNote">Use {{code}} in the text body and, if provided, the HTML body. Leave HTML blank for an automatically formatted message.</p><button class="btn primary" type="submit" data-t="saveTemplate">Save private template</button><p id="template-result" class="message" role="status"></p></form></article></section>
-    <section class="page" id="credentials"><article class="card"><div class="card-heading"><div><h2 data-t="applicationKeys">Application keys</h2><p data-t="keysIntro">Separate credentials for every app. Each key can be revoked at any time.</p></div><button id="new-key" type="button" class="btn primary" data-t="createKey">+ Create key</button></div><div id="keys-table"></div></article></section>
-    <section class="page" id="activity"><article class="card"><div class="card-heading"><div><h2 data-t="recentMessages">Recent messages</h2><p data-t="activityInfo">Provider acceptance does not guarantee inbox delivery. Messages expire after their configured TTL.</p></div></div><div id="activity-table"></div></article></section>
-    <section class="page" id="guide"><div class="twocol"><article class="card"><h2 data-t="apiExample">REST API</h2><p data-t="apiHint">Use the same endpoint for OTP and ordinary transactional messages.</p><pre id="api-example" class="code"></pre><button id="copy-api" class="btn outline" data-t="copyExample">Copy example</button></article><article class="card"><h2 data-t="smtpGuide">Private SMTP</h2><p data-t="smtpHint">SMTP is intended for private networking. STARTTLS certificate trust is required.</p><pre class="code">SMTP_HOST=couriermesh
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title>CourierMesh</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/logo.svg">
+  <link rel="stylesheet" href="/assets/vendor/bootstrap.min.css">
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body class="bg-body-tertiary">
+<div class="app-shell">
+  <aside class="app-sidebar border-end bg-white" aria-label="Main navigation">
+    <a class="app-brand d-flex align-items-center gap-2 text-decoration-none" href="/">
+      <img src="/assets/logo.svg" width="32" height="32" alt="">
+      <span class="fw-semibold text-body">CourierMesh</span>
+    </a>
+    <nav id="navigation" class="nav nav-pills flex-column flex-nowrap gap-1" aria-label="Sections">
+      <button type="button" class="nav-link current" data-view="overview" data-t="overview">Overview</button>
+      <button type="button" class="nav-link" data-view="providers" data-t="providers">Providers</button>
+      <button type="button" class="nav-link" data-view="diagnostics" data-t="diagnostics">Diagnostics</button>
+      <button type="button" class="nav-link" data-view="templates" data-t="templates">OTP template</button>
+      <button type="button" class="nav-link" data-view="credentials" data-t="credentials">API &amp; SMTP keys</button>
+      <button type="button" class="nav-link" data-view="activity" data-t="activity">Activity</button>
+      <button type="button" class="nav-link" data-view="guide" data-t="guide">Integration</button>
+      <button type="button" class="nav-link" data-view="security" data-t="security">Security</button>
+    </nav>
+  </aside>
+
+  <main class="app-main">
+    <header class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+      <h1 id="page-title" class="h4 mb-0" data-t="overview">Overview</h1>
+      <div class="d-flex align-items-center flex-wrap gap-2">
+        <label for="language" class="visually-hidden" data-t="language">Language</label>
+        <select id="language" class="form-select form-select-sm" aria-label="Language">
+          <option value="en">English</option><option value="ar">العربية</option>
+          <option value="fr">Français</option><option value="es">Español</option>
+        </select>
+        <span id="connection" class="badge text-bg-secondary"><span data-t="offline">Locked</span></span>
+        <button id="refresh" type="button" class="btn btn-sm btn-outline-secondary" data-t="refresh">Refresh</button>
+        <button id="lock" type="button" class="btn btn-sm btn-outline-secondary" data-t="lock">Lock</button>
+      </div>
+    </header>
+
+    <section id="login-view" class="auth-layout">
+      <div class="card shadow-sm border-0 auth-card"><div class="card-body p-4">
+        <h2 class="h5 mb-4" data-t="signIn">Sign in</h2>
+        <form id="login-form" class="stack">
+          <label><span data-t="username">Username</span><input class="form-control" name="username" autocomplete="username" required value="admin"></label>
+          <label><span data-t="password">Password</span><input class="form-control" name="password" type="password" autocomplete="current-password" required></label>
+          <button class="btn btn-primary w-100" data-t="signIn" type="submit">Sign in</button>
+        </form>
+        <details id="legacy-entry" class="mt-4 pt-3 border-top">
+          <summary class="small" data-t="legacySignIn">Use existing ADMIN_TOKEN</summary>
+          <form id="legacy-form" class="stack mt-3">
+            <label><span data-t="adminToken">Administrator token</span><input class="form-control" name="token" type="password" autocomplete="off" minlength="32" required></label>
+            <button class="btn btn-outline-secondary w-100" type="submit" data-t="unlock">Unlock dashboard</button>
+          </form>
+        </details>
+        <p id="login-error" class="message error mt-2" role="alert"></p>
+      </div></div>
+    </section>
+
+    <section id="password-view" class="auth-layout" hidden>
+      <div class="card border-0 shadow-sm auth-card"><div class="card-body p-4">
+        <h2 class="h5 mb-2" data-t="changeRequired">Set your new password</h2>
+        <p class="small text-secondary mb-3" data-t="passwordHint">Use at least 12 characters including upper- and lowercase letters and a number.</p>
+        <form id="required-change-form" class="stack">
+          <label><span data-t="currentPassword">Current password</span><input class="form-control" name="currentPassword" type="password" required autocomplete="current-password"></label>
+          <label><span data-t="newPassword">New password</span><input class="form-control" name="newPassword" type="password" required minlength="12" autocomplete="new-password"></label>
+          <button class="btn btn-primary w-100" type="submit" data-t="updatePassword">Change password</button>
+        </form><p id="password-error" class="message error" role="alert"></p>
+      </div></div>
+    </section>
+
+    <section id="dashboard" hidden>
+      <section class="page active" id="overview">
+        <div class="row g-3 mb-3" id="metrics"></div>
+        <div class="row g-3">
+          <div class="col-12 col-xl-6"><div class="card h-100"><div class="card-header bg-white fw-semibold" data-t="routing">Provider routing</div><div class="card-body p-0" id="overview-provider-table"></div></div></div>
+          <div class="col-12 col-xl-6"><div class="card h-100"><div class="card-header bg-white fw-semibold" data-t="sendTest">Send a real test message</div><div class="card-body">
+            <form id="test-form" class="stack">
+              <label><span data-t="messageType">Message type</span><select class="form-select" name="kind" id="test-kind"><option value="otp">OTP</option><option value="raw">Email</option></select></label>
+              <div class="row g-3"><label class="col-12 col-md-6"><span data-t="sender">Sender</span><input class="form-control" type="email" name="from" required placeholder="no-reply@example.com"></label><label class="col-12 col-md-6"><span data-t="recipient">Recipient</span><input class="form-control" type="email" name="to" required placeholder="you@example.com"></label></div>
+              <div id="real-test-raw" class="stack" hidden><label><span data-t="subject">Subject</span><input class="form-control" name="subject" value="CourierMesh test message"></label><label><span data-t="body">Message body</span><textarea class="form-control" name="text" rows="3">This is a CourierMesh delivery test.</textarea></label></div>
+              <div><button class="btn btn-primary" type="submit" data-t="sendTestButton">Send test message</button></div>
+              <p id="test-result" class="message" role="status"></p>
+            </form>
+          </div></div></div>
+        </div>
+      </section>
+
+      <section class="page" id="providers">
+        <div class="d-flex justify-content-end mb-3"><button class="btn btn-primary" id="provider-add" type="button" data-t="addProvider">Add provider</button></div>
+        <div class="card"><div class="card-body p-0" id="providers-table"></div></div>
+      </section>
+
+      <section class="page" id="diagnostics">
+        <div class="row g-3 mb-3">
+          <div class="col-12 col-lg-6"><div class="card h-100"><div class="card-body">
+            <h2 class="h6" data-t="captureMode">Connection test mode</h2>
+            <p class="small text-secondary" data-t="captureInfo">Capture incoming messages locally without sending them.</p>
+            <div class="alert alert-secondary py-2 small" id="diagnostic-status"></div>
+            <p class="small text-secondary" data-t="automaticExpiry">Turns off after 10 minutes.</p>
+            <div class="d-flex flex-wrap gap-2"><button id="diag-start" class="btn btn-primary" type="button" data-t="startCapture">Enable for 10 minutes</button><button id="diag-stop" class="btn btn-outline-secondary" type="button" data-t="stopCapture">Stop capture</button></div>
+          </div></div></div>
+          <div class="col-12 col-lg-6"><div class="card h-100"><div class="card-body">
+            <h2 class="h6" data-t="singleProbe">Single-message dry run</h2>
+            <p class="small text-secondary" data-t="singleProbeInfo">Test an individual API request without sending it.</p>
+            <pre class="code" id="probe-example"></pre><button id="copy-probe" class="btn btn-outline-secondary btn-sm" type="button" data-t="copyExample">Copy example</button>
+          </div></div></div>
+        </div>
+        <div class="card"><div class="card-header bg-white d-flex align-items-center justify-content-between"><h2 class="h6 mb-0" data-t="capturedRequests">Captured requests</h2><button class="btn btn-sm btn-outline-secondary" id="diag-refresh" type="button" data-t="refresh">Refresh</button></div><div class="card-body p-0" id="diagnostic-table"></div></div>
+      </section>
+
+      <section class="page" id="templates"><div class="card" style="max-width:800px"><div class="card-body">
+        <form id="template-form" class="stack">
+          <label><span data-t="subject">Subject</span><input class="form-control" name="subject" required maxlength="180" placeholder="Verification code"></label>
+          <label><span data-t="plainText">Plain-text body</span><textarea class="form-control" name="text" rows="6" required placeholder="Your code is {{code}}"></textarea></label>
+          <label><span data-t="htmlOptional">HTML body (optional)</span><textarea class="form-control font-monospace" name="html" rows="5" placeholder="&lt;div&gt;{{code}}&lt;/div&gt;"></textarea></label>
+          <label><span data-t="direction">Text direction</span><select class="form-select" name="direction"><option value="ltr">Left-to-right</option><option value="rtl">Right-to-left</option></select></label>
+          <p class="small text-secondary mb-0" data-t="templateNote">Use {{code}} in the text, and in HTML if set.</p>
+          <div><button class="btn btn-primary" type="submit" data-t="saveTemplate">Save template</button></div><p id="template-result" class="message" role="status"></p>
+        </form>
+      </div></div></section>
+
+      <section class="page" id="credentials"><div class="d-flex justify-content-end mb-3"><button id="new-key" type="button" class="btn btn-primary" data-t="createKey">Create key</button></div><div class="card"><div class="card-body p-0" id="keys-table"></div></div></section>
+      <section class="page" id="activity"><div class="card"><div class="card-body p-0" id="activity-table"></div></div></section>
+
+      <section class="page" id="guide"><div class="row g-3">
+        <div class="col-12 col-lg-6"><div class="card h-100"><div class="card-body"><h2 class="h6">REST API</h2><pre id="api-example" class="code"></pre><button id="copy-api" class="btn btn-outline-secondary btn-sm" type="button" data-t="copyExample">Copy example</button></div></div></div>
+        <div class="col-12 col-lg-6"><div class="card h-100"><div class="card-body"><h2 class="h6" data-t="smtpGuide">SMTP</h2><pre class="code">SMTP_HOST=couriermesh
 SMTP_PORT=2525
 SMTP_USER=&lt;KEY_ID&gt;
 SMTP_PASSWORD=&lt;SECRET&gt;
-SMTP_REQUIRE_TLS=true</pre><p class="muted" data-t="smtpNote">Use X-CourierMesh-OTP for OTP templates, or X-CourierMesh-Probe: true for a no-send test.</p></article></div></section>
-    <section class="page" id="security"><article class="card narrow"><h2 data-t="accountSecurity">Account security</h2><p data-t="securityIntro">Update the administrator password. Existing ADMIN_TOKEN authentication remains available for backward compatibility if configured.</p><form id="change-password-form" class="stack"><label><span data-t="currentPassword">Current password</span><input type="password" name="currentPassword" required autocomplete="current-password"></label><label><span data-t="newPassword">New password</span><input type="password" name="newPassword" required minlength="12" autocomplete="new-password"></label><button class="btn primary" data-t="updatePassword">Change password</button><p id="security-result" class="message" role="status"></p></form></article></section>
-   </section>
-   <footer class="footer">CourierMesh · <span data-t="footer">Private, open-source transactional delivery</span></footer>
- </main>
+SMTP_REQUIRE_TLS=true</pre><p class="small text-secondary mb-0" data-t="smtpNote">Use X-CourierMesh-OTP for OTP; X-CourierMesh-Probe: true for connection tests.</p></div></div></div>
+      </div></section>
+
+      <section class="page" id="security"><div class="card" style="max-width:620px"><div class="card-body">
+        <form id="change-password-form" class="stack">
+          <label><span data-t="currentPassword">Current password</span><input class="form-control" type="password" name="currentPassword" required autocomplete="current-password"></label>
+          <label><span data-t="newPassword">New password</span><input class="form-control" type="password" name="newPassword" required minlength="12" autocomplete="new-password"></label>
+          <div><button class="btn btn-primary" type="submit" data-t="updatePassword">Change password</button></div><p id="security-result" class="message" role="status"></p>
+        </form>
+      </div></div></section>
+    </section>
+  </main>
 </div>
-<dialog id="modal"><form id="modal-form" class="modal-card"><div class="modal-head"><h2 id="modal-title"></h2><button type="button" class="btn ghost square" id="modal-close" aria-label="Close">×</button></div><div id="modal-content" class="stack"></div><p id="modal-error" class="message error" role="alert"></p><div class="actions end"><button type="button" class="btn outline" id="modal-cancel" data-t="cancel">Cancel</button><button type="submit" class="btn primary" id="modal-save" data-t="save">Save</button></div></form></dialog>
+
+<dialog id="modal" class="cm-dialog"><form id="modal-form" class="modal-content">
+  <div class="modal-header"><h2 class="modal-title fs-5" id="modal-title"></h2><button type="button" class="btn-close" id="modal-close" aria-label="Close"></button></div>
+  <div class="modal-body"><div id="modal-content" class="stack"></div><p id="modal-error" class="message error" role="alert"></p></div>
+  <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" id="modal-cancel" data-t="cancel">Cancel</button><button type="submit" class="btn btn-primary" id="modal-save" data-t="save">Save</button></div>
+</form></dialog>
 <div id="toast" role="status" aria-live="polite"></div>
-<script type="module" src="/assets/app.js"></script></body></html>
+<script type="module" src="/assets/app.js"></script>
+</body>
+</html>

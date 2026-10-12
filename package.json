@@ -1,6 +1,6 @@
 {
   "name": "couriermesh",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "description": "Self-hosted transactional email gateway with private templates, diagnostics, multilingual admin UI and six HTTPS delivery adapters.",
   "type": "module",

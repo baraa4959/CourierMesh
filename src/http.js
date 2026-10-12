@@ -6,7 +6,7 @@ import { randomBytes } from 'node:crypto';
 import { constantEqual } from './crypto.js';
 import { email, validateMessage } from './validate.js';
 const base = resolve(dirname(fileURLToPath(import.meta.url)), '../public');
-const allowedFiles = { '/': 'index.html', '/assets/app.js': 'app.js', '/assets/i18n.js': 'i18n.js', '/assets/style.css': 'style.css', '/assets/logo.svg': 'logo.svg' };
+const allowedFiles = { '/': 'index.html', '/assets/app.js': 'app.js', '/assets/i18n.js': 'i18n.js', '/assets/style.css': 'style.css', '/assets/vendor/bootstrap.min.css': 'vendor/bootstrap.min.css', '/assets/logo.svg': 'logo.svg' };
 const mimetypes = { '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', 'other': 'text/html; charset=utf-8' };
 const limits = new Map();
 function allowRate(identity, limit = 180) { const now = Date.now(); const x = limits.get(identity); if (!x || x.time < now - 60000) { if (limits.size > 10000) for (const [id, v] of limits) if (v.time < now - 60000) limits.delete(id); limits.set(identity, { count: 1, time: now }); return true; } return ++x.count <= limit; }
