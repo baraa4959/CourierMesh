@@ -26,11 +26,11 @@ Accept a message asynchronously. Returns `202 Accepted` with a durable message I
 ```json
 {
   "kind": "otp",
-  "to": "student@example.com",
+  "to": "recipient@example.net",
   "from": "no-reply@notify.example.com",
   "subject": "Verify your email address",
   "code": "123456",
-  "variables": {"appName": "Student Portal"}
+  "variables": {"appName": "Example App"}
 }
 ```
 
@@ -39,10 +39,10 @@ For ordinary messages, use `kind=raw` and provide `text` and/or `html`:
 ```json
 {
   "kind": "raw",
-  "to": "student@example.com",
+  "to": "recipient@example.net",
   "from": "no-reply@notify.example.com",
   "subject": "Welcome",
-  "text": "Your registration was approved."
+  "text": "Your account is ready."
 }
 ```
 
