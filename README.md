@@ -6,7 +6,7 @@
 
 **One endpoint. Six delivery adapters. Your limits, under control.**
 
-An open-source, self-hosted transactional email gateway built for verification codes, authentication mail and small applications. Deploy on a single VM with no paid database, Redis queue, or proprietary backend.
+An open-source, self-hosted email delivery gateway for any application: transactional messages, notifications, verification codes, receipts, and alerts. Deploy on a single VM without a paid database, Redis queue, or proprietary backend.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg) ![Node](https://img.shields.io/badge/node-22%2B-339933) ![Docker](https://img.shields.io/badge/deployment-Docker-2496ed) ![SMTP](https://img.shields.io/badge/SMTP-STARTTLS-35bfaa) ![Providers](https://img.shields.io/badge/providers-6-8475ef)
 
@@ -18,7 +18,7 @@ An open-source, self-hosted transactional email gateway built for verification c
 
 ## Why CourierMesh?
 
-Running a small self-hosted application should not require a paid transactional email subscription or opening outbound SMTP port 25. CourierMesh accepts messages through **one authenticated HTTPS API** or **one internal SMTP endpoint**, then hands them to whichever configured provider has available capacity.
+Connect applications to multiple email delivery providers without exposing an outbound SMTP port 25 dependency. CourierMesh accepts messages through **one authenticated HTTPS API** or **one internal SMTP endpoint**, then hands them to whichever configured provider has available capacity.
 
 It does not bypass the terms, approval requirements, abuse checks, or quotas imposed by a provider. Your account is responsible for ensuring that its sending volume and domain authorization are valid.
 
@@ -44,17 +44,17 @@ It does not bypass the terms, approval requirements, abuse checks, or quotas imp
 
 ```mermaid
 flowchart TD
-    A[Student application] -->|HTTPS 443 / REST API| B[CourierMesh]
+    A[Any application] -->|HTTPS 443 / REST API| B[CourierMesh]
     A -->|Internal SMTP 2525 / STARTTLS| B
     B --> C[(Encrypted SQLite outbox)]
     C --> D{Priority and quota router}
-    D --> E[Loops - OTP templates]
+    D --> E[Loops - templates]
     D --> F[Resend]
     D --> G[Brevo]
     D --> H[Mailjet]
     D --> I[SMTP2GO]
     D --> J[SendPulse]
-    E --> K[Student mailbox]
+    E --> K[Recipient inbox]
     F --> K
     G --> K
     H --> K
@@ -62,7 +62,7 @@ flowchart TD
     J --> K
 ```
 
-Every provider request goes out over HTTPS **port 443**. Oracle Always Free's outbound SMTP 25 restrictions do not affect these API adapters.
+All six provider adapters make outbound requests over HTTPS **port 443**. This design works on hosts where direct outbound SMTP port 25 is restricted, provided the selected providers permit sending from your account.
 
 ## Quick start
 
@@ -87,7 +87,7 @@ Open the admin console on `http://127.0.0.1:8080` through an HTTPS reverse proxy
 2. Add and enable a provider with verified sending domain, API credentials, and quotas.
 3. Create an application key with an exact authorized sender address.
 4. Connect via HTTPS API (best for OTP) or authenticated private-network SMTP.
-5. Run a real single-recipient acceptance and inbox test before inviting students.
+5. Run a real single-recipient acceptance and inbox test before sending production traffic.
 
 For Easypanel instructions, persistent storage, networking, TLS trust, and deployment constraints, see [Deployment](docs/DEPLOYMENT.md).
 
@@ -117,28 +117,29 @@ For Easypanel instructions, persistent storage, networking, TLS trust, and deplo
 
 These defaults are *locally configured safety budgets*, **not** verified account entitlements. Provider offers, rate limits, account status and terms change. The monthly cap is a conservative **rolling 30-day window**. Daily resets at **00:00 UTC**. A zero cap means *no local cap*—it does not change the provider's own cap. Set more restrictive numbers for new/unapproved accounts.
 
-## Send an OTP (HTTPS)
+## Send an email (HTTPS)
 
 ```bash
-curl -X POST https://mail-gateway.yourdomain.com/v1/send \
+curl -X POST https://mail-gateway.example.com/v1/send \
   -H 'Authorization: Bearer KEY_ID.SECRET' \
-  -H 'Idempotency-Key: signup-student-123' \
+  -H 'Idempotency-Key: receipt-order-123' \
   -H 'Content-Type: application/json' \
   -d '{
-    "kind": "otp",
-    "from": "no-reply@notify.yourdomain.com",
-    "to": "student@example.com",
-    "subject": "Your CCIT verification code",
-    "code": "782194",
-    "variables": {"appName": "CCIT Students"}
+    "kind": "raw",
+    "from": "no-reply@notify.example.com",
+    "to": "recipient@example.net",
+    "subject": "Your order receipt",
+    "text": "Thanks for your order! Your receipt is ready."
   }'
 ```
+
+For one-time passcodes, email verification, or password resets, use `kind: "otp"` with a `code` field and an optional `variables` object. Both modes use the same authenticated endpoint; choose a provider that supports the selected message type. See [API and SMTP](docs/API.md) for complete examples. Loops requires a published transactional template; it does not send free-form email unless a generic template is configured.
 
 ```json
 {"id":"75f...","status":"queued","duplicate":false}
 ```
 
-A `202` response means the request is **durably queued**, **not delivered**. Poll `GET /v1/messages/{id}` using the same application key to observe `accepted`, `failed`, `expired`, or `unknown`. For OTP flows, make sure your application's OTP expiration and gateway queue deadline are consistent. Never expose the application key to browser JavaScript.
+A `202` response means the request is **durably queued**, **not delivered**. Poll `GET /v1/messages/{id}` using the same application key to observe `accepted`, `failed`, `expired`, or `unknown`. For time-sensitive messages such as OTP codes, align your application's expiration policy with the gateway queue deadline. Never expose the application key to browser JavaScript.
 
 For SMTP usage, see [API and SMTP](docs/API.md). For the implementation details of quota routing and crash recovery, see [Architecture](docs/ARCHITECTURE.md).
 
